@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  # Hyperledger Fabric Network
+  orderer:
+    image: hyperledger/fabric-orderer:latest
+    container_name: orderer.example.com
+    environment:
+      - FABRIC_LOGGING_SPEC=INFO
+      - ORDERER_GENERAL_LISTENADDRESS=0.0.0.0
+      - ORDERER_GENERAL_GENESISPROFILE=SampleDevModeEtcdRaft
+      - ORDERER_GENERAL_LOCALMSPID=OrdererMSP
+      - ORDERER_GENERAL_TLS_ENABLED=true
+    ports:
+      - "7050:7050"
+    volumes:
+      - ./fabric-samples/test-network/organizations/ordererOrganizations:/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations
+    command: orderer
+
+  peer0-org1:
+    image: hyperledger/fabric-peer:latest
+    container_name: peer0.org1.example.com
+    environment:
+      - CORE_PEER_ID=peer0.org1.example.com
+      - CORE_PEER_ADDRESS=peer0.org1.example.com:7051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:7051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.org1.example.com:7052
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.org1.example.com:7051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.org1.example.com:7051
+      - CORE_PEER_LOCALMSPID=Org1MSP
+      - CORE_PEER_TLS_ENABLED=true
+    ports:
+      - "7051:7051"
+    volumes:
+      - ./fabric-samples/test-network/organizations/peerOrganizations:/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations
+    depends_on:
+      - orderer
+
+  peer0-org2:
+    image: hyperledger/fabric-peer:latest
+    container_name: peer0.org2.example.com
+    environment:
+      - CORE_PEER_ID=peer0.org2.example.com
+      - CORE_PEER_ADDRESS=peer0.org2.example.com:9051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:9051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.org2.example.com:9052
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.org2.example.com:9051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.org2.example.com:9051
+      - CORE_PEER_LOCALMSPID=Org2MSP
+      - CORE_PEER_TLS_ENABLED=true
+    ports:
+      - "9051:9051"
+    volumes:
+      - ./fabric-samples/test-network/organizations/peerOrganizations:/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations
+    depends_on:
+      - orderer
+
+  # IPFS Node
+  ipfs:
+    image: ipfs/go-ipfs:latest
+    container_name: ipfs-node
+    ports:
+      - "4001:4001"
+      - "5001:5001"
+      - "8080:8080"
+    volumes:
+      - ipfs-data:/data/ipfs
+    command: daemon --migrate=true --enable-gc
+
+  # Spring Boot API
+  api:
+    build:
+      context: ./application/api-spring
+      dockerfile: Dockerfile
+    container_name: document-registry-api
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=production
+      - IPFS_API_BASE=http://ipfs:5001
+    depends_on:
+      - peer0-org1
+      - peer0-org2
+      - ipfs
+    volumes:
+      - ./logs:/app/logs
+
+volumes:
+  ipfs-data:
