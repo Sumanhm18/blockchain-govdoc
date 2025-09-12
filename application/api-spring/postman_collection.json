@@ -1,0 +1,80 @@
+{
+  "info": {
+    "name": "Gov DocRegistry API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "b2f6f6e3-7b7f-4d2a-a3c2-1b6f1c0c0abc"
+  },
+  "item": [
+    {
+      "name": "Register Document",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": { "raw": "{{baseUrl}}/api/documents", "host": ["{{baseUrl}}"], "path": ["api","documents"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"docId\": \"DOC-POSTMAN-1\",\n  \"hash\": \"sha256:0123456789abcdef\",\n  \"issuer\": \"Ministry\",\n  \"subject\": \"Citizen A\",\n  \"metadataJson\": \"{\\\"type\\\":\\\"Passport\\\"}\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Get Document",
+      "request": {
+        "method": "GET",
+        "url": { "raw": "{{baseUrl}}/api/documents/DOC-POSTMAN-1", "host": ["{{baseUrl}}"], "path": ["api","documents","DOC-POSTMAN-1"] }
+      }
+    },
+    {
+      "name": "Verify Document",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": { "raw": "{{baseUrl}}/api/documents/DOC-POSTMAN-1/verify", "host": ["{{baseUrl}}"], "path": ["api","documents","DOC-POSTMAN-1","verify"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"hash\": \"sha256:0123456789abcdef\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Revoke Document",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": { "raw": "{{baseUrl}}/api/documents/DOC-POSTMAN-1/revoke", "host": ["{{baseUrl}}"], "path": ["api","documents","DOC-POSTMAN-1","revoke"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reason\": \"expired\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Upload + Register",
+      "request": {
+        "method": "POST",
+        "url": { "raw": "{{baseUrl}}/api/documents/upload", "host": ["{{baseUrl}}"], "path": ["api","documents","upload"] },
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "file", "type": "file", "src": [] },
+            { "key": "docId", "value": "DOC-POSTMAN-UP", "type": "text" },
+            { "key": "issuer", "value": "Ministry", "type": "text" },
+            { "key": "subject", "value": "Citizen Q", "type": "text" },
+            { "key": "type", "value": "TestUpload", "type": "text" }
+          ]
+        }
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8081" }
+  ]
+}
+
+
