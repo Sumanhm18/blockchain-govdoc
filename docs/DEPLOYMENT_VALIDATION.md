@@ -4,6 +4,8 @@
 
 Draft PR: https://github.com/Sumanhm18/blockchain-govdoc/pull/1. The initial GitHub check did not start: GitHub reported an account lock caused by a billing issue. This is an external account blocker, not a passing or failing source test. An account owner must resolve billing and rerun the workflows. No payment or billing setting was changed.
 
+The authorized history cleanup is published on both branches. See [History cleanup](HISTORY_CLEANUP.md); existing clones must not reintroduce old history.
+
 ## Citizen access
 
 An issuer can supply optional `ownerSubject` on metadata registration or multipart upload. This must be the citizen's immutable OIDC `sub`, obtained through the authorized issuance process, not an email address or display name. The API stores only `SHA-256(issuer URL + NUL + sub)` as `metadata.ownerSubjectHash`; it does not retain that raw ownership identifier. This is pseudonymization, not anonymity or a defense against a known-identifier dictionary attack.

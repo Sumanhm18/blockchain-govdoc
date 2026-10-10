@@ -8,6 +8,8 @@ The new development setup enrolls fresh identities and generates independent acc
 
 `./scripts/prepare-history-cleanup.sh` creates a **local sanitized mirror** after changes have been committed and `git-filter-repo` is installed. It does not alter the working repository or push. Review its report, coordinate with repository administrators, rotate affected credentials first, then agree an explicit force-push window and require fresh clones. Contact the Git hosting provider about cached commits and sensitive-data removal. Existing forks/backups are outside Git rewrite guarantees.
 
+The authorized branch-history rewrite has now been published; see [History cleanup](HISTORY_CLEANUP.md) for verified results, fresh-clone instructions and the remaining external incident actions.
+
 ## Enforced controls
 
 - Fail-closed API authentication; explicit read/issue/revoke/operator roles.
