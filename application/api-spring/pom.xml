@@ -14,6 +14,9 @@
   <properties>
     <java.version>17</java.version>
     <protobuf.version>4.36.2</protobuf.version>
+    <jackson-bom.version>2.21.7</jackson-bom.version>
+    <tomcat.version>10.1.60</tomcat.version>
+    <log4j2.version>2.25.5</log4j2.version>
   </properties>
   <dependencies>
     <dependency>

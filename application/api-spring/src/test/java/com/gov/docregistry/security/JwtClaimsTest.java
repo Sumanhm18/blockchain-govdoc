@@ -11,6 +11,7 @@ class JwtClaimsTest {
   private Jwt token(String issuer, String audience, String department, Instant expiry) {
     return Jwt.withTokenValue("synthetic")
         .header("alg", "RS256")
+        .subject("test-subject")
         .issuer(issuer)
         .audience(List.of(audience))
         .claim("department", department)

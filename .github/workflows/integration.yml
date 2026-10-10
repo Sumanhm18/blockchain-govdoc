@@ -1,12 +1,13 @@
 name: Development integration
 on:
+  pull_request:
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   integration:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -20,6 +21,23 @@ jobs:
         run: ./test_demo.sh
       - name: Durable recovery across IPFS outage and API restart
         run: python3 scripts/test-recovery.py
+      - name: Quorum and certificate revocation recovery
+        run: |
+          python3 scripts/test-quorum-recovery.py
+          python3 scripts/test-revocation.py
+      - name: HTTPS and real identity-provider checks
+        run: |
+          ./scripts/staging.sh up
+          python3 scripts/wait-staging.py
+          python3 scripts/test-oidc.py
+      - name: Encrypted backup restore drill
+        run: |
+          python3 -m venv .runtime/ops-tools
+          .runtime/ops-tools/bin/pip install -r config/operations-tools-requirements.txt
+          .runtime/ops-tools/bin/python scripts/test-backup-restore.py
+      - name: Stop staging
+        if: always()
+        run: ./scripts/staging.sh stop
       - name: Stop only this project's services
         if: always()
         run: ./scripts/stop-dev.sh

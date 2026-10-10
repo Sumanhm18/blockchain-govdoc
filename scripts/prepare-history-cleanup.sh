@@ -6,7 +6,7 @@ cd "$ROOT_DIR"
 umask 077
 command -v git-filter-repo >/dev/null || { echo 'Install git-filter-repo in an isolated tool environment first.' >&2; exit 1; }
 [[ -z "$(git status --porcelain --untracked-files=normal)" ]] || { echo 'Commit and review source changes before preparing a history rewrite.' >&2; exit 1; }
-DEST="$ROOT_DIR/.runtime/history-cleanup.git"
+DEST="${1:-$ROOT_DIR/.runtime/history-cleanup.git}"
 [[ ! -e "$DEST" ]] || { echo 'A candidate already exists; review it before generating another.' >&2; exit 1; }
 mkdir -p "$ROOT_DIR/.runtime"
 git clone --mirror --no-local "$ROOT_DIR" "$DEST"
@@ -18,5 +18,5 @@ git -C "$DEST" filter-repo --force --invert-paths \
   --path application/gateway/ --path connection-org1.json --path network/test-network/ \
   --path-glob '*.pem' --path-glob '*.key' --path-glob '*_sk' --path-glob '*.id'
 python3 "$ROOT_DIR/scripts/check-history.py" "$DEST"
-printf 'Local candidate created at .runtime/history-cleanup.git. No remote was changed.\n'
+printf 'Local candidate created at %s. No remote was changed.\n' "$DEST"
 printf 'Review all history and filter coverage, rotate exposed credentials, coordinate force-push approval and fresh clones.\n'

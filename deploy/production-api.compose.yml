@@ -1,0 +1,45 @@
+# Deployment template for an operator-provisioned host; not the local staging topology.
+name: govdoc-production-api
+services:
+  api:
+    image: ${REGISTRY_IMAGE:?Set a reviewed immutable image digest}
+    user: "10001:10001"
+    ports: ["${REGISTRY_BIND_IP:?Bind to a controlled host interface}:8443:8443"]
+    environment:
+      SPRING_PROFILES_ACTIVE: production
+      REGISTRY_AUTH_MODE: jwt
+      SERVER_PORT: 8443
+      SERVER_SSL_ENABLED: "true"
+      SERVER_SSL_CERTIFICATE: /run/tls/certificate.pem
+      SERVER_SSL_CERTIFICATE_PRIVATE_KEY: /run/tls/private-key.pem
+      REGISTRY_JWT_ISSUER: ${REGISTRY_JWT_ISSUER:?Set the HTTPS identity issuer}
+      REGISTRY_JWT_AUDIENCE: govdoc-api
+      REGISTRY_ISSUER: ${REGISTRY_ISSUER:?Set the department}
+      FABRIC_MSP: ${FABRIC_MSP:?Set the issuing MSP}
+      FABRIC_PEER: ${FABRIC_PEER:?Set the gateway endpoint}
+      FABRIC_AUTHORITY: ${FABRIC_AUTHORITY:?Set the peer TLS hostname}
+      FABRIC_CHANNEL: ${FABRIC_CHANNEL:?Set the channel}
+      FABRIC_CHAINCODE: docregistry
+      FABRIC_CERT: /run/identity/signcerts/cert.pem
+      FABRIC_KEY: /run/identity/keystore/key.pem
+      FABRIC_TLS_CERT: /run/identity/tls-ca.pem
+      REGISTRY_KEYS_FILE: /run/secrets/encryption.json
+      REGISTRY_DATABASE_URL: jdbc:h2:file:/app/data/registry;DB_CLOSE_ON_EXIT=FALSE
+      IPFS_API_BASE: ${IPFS_API_BASE:?Set the private IPFS admin endpoint}
+      REGISTRY_CORS_ORIGINS: ${REGISTRY_CORS_ORIGINS:-}
+    volumes:
+      - ${FABRIC_IDENTITY_DIR:?Project a provisioned identity}:/run/identity:ro
+      - ${TLS_CERT_FILE:?Provide the public TLS certificate}:/run/tls/certificate.pem:ro
+      - ${TLS_KEY_FILE:?Project the TLS key from a secret store}:/run/tls/private-key.pem:ro
+      - ${DOCUMENT_KEYS_FILE:?Project a versioned encryption key ring}:/run/secrets/encryption.json:ro
+      - ${JOURNAL_DIR:?Provide persistent storage owned by UID 10001}:/app/data
+      - ${AUDIT_LOG_DIR:?Provide restricted audit storage}:/app/logs
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    deploy:
+      replicas: 1
+      resources:
+        limits: {memory: 2G, cpus: '2'}

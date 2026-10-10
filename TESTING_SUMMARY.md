@@ -1,18 +1,22 @@
 # Validation record
 
-Validated locally on 10 October 2026 using macOS arm64, Docker Desktop, a fresh isolated Fabric development network, IPFS and synthetic documents only. No external government deployment was tested.
+Validated locally on 11 October 2026 using macOS arm64, Docker Desktop, a fresh isolated Fabric development network, IPFS and synthetic documents only. No external government deployment was tested.
 
 ## Automated suites
 
 | Check | Result / coverage |
 |---|---|
-| Java Maven suite | 32 tests pass: HTTP authentication/roles/validation/errors, JWT claim validation, account/IP limits, structured IPFS responses/failures/limits, encryption and tampering, durable recovery, duplicate handling, revoked download and Gateway dependency compatibility |
+| Java Maven suite | 41 tests pass: signed JWT validation, citizen ownership and department isolation, protected metrics, HTTP authentication/roles/validation/errors, JWT claim validation, account/IP limits, structured IPFS responses/failures/limits, encryption and tampering, durable recovery, duplicate handling, revoked download and Gateway dependency compatibility |
 | Node contract suite | 15 tests pass: registration, issuer attributes, cross-department/MSP denial, duplicates, missing IDs, validation, matching/mismatching/revoked outcomes, deterministic metadata, post-2038 timestamps, history and Fabric dispatcher argument count |
 | Live API/IPFS/Fabric | 16 checks pass: authenticated upload, encrypted IPFS bytes, verified plaintext download, hash/file verification, revocation, duplicates, missing records and history |
 | Direct Fabric authorization | 2 checks pass: unattributed identity and department impersonation rejected without relying on HTTP security |
 | Live outage/restart recovery | Pass: IPFS failure, durable staging, API restart, automatic recovery, exact download and no duplicate registration |
 | Repeat deployment | Pass: rerunning `deploy.sh` preserves the existing development state and returns readiness |
 | Container build | Multi-stage build passes Maven tests on Java 17; API starts as a non-root user with read-only root filesystem and secret mounts |
+| Real HTTPS/OIDC staging | 37 checks pass against Keycloak, including token signature/discovery, citizen isolation, ownership retry conflicts and revocation; 20 concurrent-read smoke requests have zero failures |
+| Encrypted restore | Pass: encrypted snapshot, tamper rejection, checksums and exact download from an isolated restored API/IPFS instance |
+| Disposable certificate revocation | Pass: enrollment, CA revocation, signed channel MSP CRL update, revoked identity denial and existing service continuity |
+| Required endorser outage | Pass: writes fail safely during outage and recover without duplicate registration; this is not HA failover |
 | npm audit | No advisories reported for the locked chaincode dependency graph at validation time |
 | Source hygiene | Private-key/generated-artifact pattern check and `git diff --check` pass |
 
@@ -36,8 +40,8 @@ python3 scripts/check-secrets.py
 python3 scripts/test-recovery.py
 ```
 
-CI definitions are included for source checks and a manually invoked full development integration run. They have not yet run on GitHub because these changes have not been pushed. Runtime logs contain private CA/bootstrap material and are intentionally excluded from CI artifacts.
+CI definitions run source and development integration checks on pull requests, with manual integration dispatch also available. The draft PR is published, but GitHub rejected workflow startup because the account is locked by a billing issue; hosted CI has not executed. Runtime logs contain private CA/bootstrap material and are intentionally excluded from CI artifacts.
 
 ## Not established by these tests
 
-Production readiness, external OIDC integration, HSM/KMS integration, certificate-revocation rollout, multi-node failover, multi-instance journal correctness, malicious-file detection, load/latency targets, legal compliance, comprehensive vulnerability absence, third-party penetration testing and disaster recovery are not established. The npm result is point-in-time and does not assess Maven/container/OS dependencies. The source scan is a limited check, not a full history secret audit. Read [Security](docs/SECURITY.md) and [Operations](docs/OPERATIONS.md).
+Production readiness, live government identity integration, HSM/KMS integration, revocation on unidentified external deployments, highly available failover, multi-instance journal correctness, malicious-file detection, production load targets, legal compliance, vulnerability absence, penetration testing and full disaster recovery are not established. Read [Security scan](docs/SECURITY_SCAN.md) for residual Maven/container findings and coverage limits. History checks search limited private-key patterns; they cannot prove all sensitive data has been removed. Read [Security](docs/SECURITY.md) and [Operations](docs/OPERATIONS.md).

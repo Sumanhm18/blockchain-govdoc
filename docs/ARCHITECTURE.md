@@ -54,4 +54,4 @@ Download checks revocation, fetches bounded ciphertext, verifies the authenticat
 
 ## Privacy boundaries
 
-Document bytes are encrypted before leaving the API. Ledger metadata, hashes, issuer identities, transaction IDs and subject references remain visible to channel members. Do not put personal details, filenames or confidential revocation explanations into these immutable fields. A subject is a reference, not a verified ownership claim. Loss of all copies of an encryption key makes its documents unrecoverable.
+Document bytes are encrypted before leaving the API. Ledger metadata, hashes, issuer identities, transaction IDs and subject references remain visible to channel members. Do not put personal details, filenames or confidential revocation explanations into these immutable fields. The display subject is a reference, not proof of ownership. Citizen authorization uses a separate issuer-assigned hash of the OIDC issuer and immutable subject. Loss of all copies of an encryption key makes its documents unrecoverable.

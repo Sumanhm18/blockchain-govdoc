@@ -32,7 +32,7 @@ Restart with `./deploy.sh`. Do not run the upstream sample `network.sh down` dir
 | `REGISTRY_RATE_LIMIT` | Authenticated requests/account/minute, default 120 |
 | `REGISTRY_IP_RATE_LIMIT` | Preauthentication requests/direct IP/minute, default 600 |
 
-Start a production adaptation with `SPRING_PROFILES_ACTIVE=production`, explicitly provisioned JWT issuer, TLS and production identity/storage settings. The supplied Compose file is intentionally a development Basic-auth override and must not be promoted unchanged. JWTs require `department` matching `REGISTRY_ISSUER` and a `roles` list containing relevant `READER`, `ISSUER`, `REVOKER` or `OPERATOR` values. Java verifies issuer signatures through discovery/JWKs. There is no local production identity provider in this repository.
+Start a production adaptation with `SPRING_PROFILES_ACTIVE=production`, explicitly provisioned JWT issuer, TLS and production identity/storage settings. The supplied Compose file is intentionally a development Basic-auth override and must not be promoted unchanged. JWTs require `department` matching `REGISTRY_ISSUER` and a `roles` list containing relevant `READER`, `CITIZEN`, `ISSUER`, `REVOKER` or `OPERATOR` values. Java verifies issuer signatures through discovery/JWKs. The separate HTTPS Keycloak staging environment is documented in [Deployment validation](DEPLOYMENT_VALIDATION.md); its synthetic realm is not a production identity directory.
 
 HTTPS can terminate in the application with Spring SSL settings. If terminating at a reverse proxy, establish a private trusted hop and explicitly review Spring forwarded-header handling; default configuration ignores forwarded headers. Put preauthentication rate/connection/body limits and appropriate request timeouts at ingress.
 

@@ -5,12 +5,12 @@ Base URL in development: `http://127.0.0.1:18081`. Every `/api/**` request requi
 | Method and path | Role | Input / result |
 |---|---|---|
 | POST `/api/documents` | ISSUER | JSON metadata registration; no file storage |
-| POST `/api/documents/upload` | ISSUER | multipart `file`, `docId`; optional `issuer`, `subject`, `type` |
-| GET `/api/documents/{id}` | READER | Document record |
-| POST `/api/documents/{id}/verify` | READER | JSON `{ "hash": "sha256:<64 lowercase hex>" }` |
-| POST `/api/documents/{id}/verify-file` | READER | multipart `file`; digest computed by API |
+| POST `/api/documents/upload` | ISSUER | multipart `file`, `docId`; optional `issuer`, `subject`, `type`, `ownerSubject` |
+| GET `/api/documents/{id}` | READER or owning CITIZEN | Document record |
+| POST `/api/documents/{id}/verify` | READER or owning CITIZEN | JSON `{ "hash": "sha256:<64 lowercase hex>" }` |
+| POST `/api/documents/{id}/verify-file` | READER or owning CITIZEN | multipart `file`; digest computed by API |
 | POST `/api/documents/{id}/revoke` | REVOKER | JSON `{ "reason": "nonempty reason" }` |
-| GET `/api/documents/{id}/file` | READER | Decrypted verified attachment; revoked records rejected |
+| GET `/api/documents/{id}/file` | READER or owning CITIZEN | Decrypted verified attachment; revoked records rejected |
 | GET `/api/documents/{id}/history` | READER | `{docId, events, truncated}` |
 | GET `/api/documents/{id}/registration` | ISSUER | Local upload state, attempts, safe code and timestamp |
 | GET `/actuator/health/readiness` | Public | Real dependency readiness, no internal detail |
@@ -45,4 +45,6 @@ Errors use `{ "code": "...", "message": "..." }` without raw dependency diagnost
 
 HTTP **202** `REGISTRATION_PENDING` means the upload is durably staged, but confirmation is not yet established. Poll `/{id}/registration`, then fetch the document after `CONFIRMED`. States: `STAGING`, `PINNED`, `SUBMITTING`, `CONFIRMED`, `REJECTED`. Retry the same ID, file and fields to resume. Different content or metadata for the same ID is a conflict. Do not create a different ID merely because a request timed out.
 
-Compatibility changes are intentional security boundaries: authentication is required; issuer spoofing and unauthorized mutation are rejected; legacy identities without department attributes cannot write; a revocation reason is mandatory. Version-1 records remain readable/verifiable when their IDs satisfy validation, but revocation without recorded issuer MSP and plaintext-storage download require reviewed migration. Invalid old IDs need a separately reviewed compatibility migration, not relaxed global validation.
+Compatibility changes are intentional security boundaries: authentication is required; issuer spoofing and unauthorized mutation are rejected; legacy identities without department attributes cannot write; a revocation reason is mandatory. The chaincode retains version-1 records, but REST read/verification requires recorded department and issuer MSP provenance; ambiguous legacy records and plaintext-storage downloads require reviewed migration. Invalid old IDs need a separately reviewed compatibility migration, not relaxed global validation.
+
+Citizen access requires an issuer-assigned `ownerSubject` at registration/upload; the API stores an issuer-scoped hash, checks the JWT subject and hides inaccessible records behind 404. See [the ownership policy](DEPLOYMENT_VALIDATION.md). Legacy records without a verified issuing MSP are denied by the departmental REST access policy even when chaincode can still query them.

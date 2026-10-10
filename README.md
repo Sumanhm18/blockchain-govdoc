@@ -32,6 +32,7 @@ The synthetic integration test registers and revokes a new test record. It check
 - [Architecture and trust boundaries](docs/ARCHITECTURE.md)
 - [API contract and compatibility](docs/API.md)
 - [Operation, recovery, backup and rotation](docs/OPERATIONS.md)
+- [TLS/OIDC staging, citizen access and operational drills](docs/DEPLOYMENT_VALIDATION.md)
 - [Security and historical credential exposure](docs/SECURITY.md)
 - [Validation evidence and remaining work](TESTING_SUMMARY.md)
 
@@ -48,6 +49,6 @@ CI runs these checks. A separately invoked integration workflow provisions the d
 
 ## Scope
 
-Readers in a configured department can read all records accessible through that API, including decrypted downloads. This is role-based access, not citizen ownership enforcement. The API uses one Fabric service identity per department; Fabric records that identity, while application audit logs identify the authenticated account by a stable hash. Deploy separate departmental instances and reviewed Fabric policies before adding departments.
+Department readers can access records from their issuing department/MSP. Citizens with validated JWTs can retrieve, download and verify records assigned to their issuer/subject hash. Citizens cannot issue, revoke or access history. The API still uses one Fabric service identity per department; application logs identify individual actors by a stable hash. See the deployment validation document for identity proofing and production limits.
 
 QR codes, a frontend, DID/VC, selective disclosure, zero-knowledge proofs, malware scanning, replicated IPFS, multi-orderer availability and performance benchmarking are not implemented. See the operations and security documents before adapting this development setup for real documents.

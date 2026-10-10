@@ -7,6 +7,9 @@ RUN mvn -B -q package
 
 FROM library/eclipse-temurin:17-jre-jammy@sha256:8993f1aed8b25fcea7a7047a7949c1866fa558fc6830d938c22c4f13b26be9d7
 WORKDIR /app
+# Apply the reviewed OpenSSL security fix until the pinned base includes it.
+RUN apt-get update && apt-get install -y --no-install-recommends libssl3=3.0.2-0ubuntu1.30 \
+    && rm -rf /var/lib/apt/lists/*
 RUN mkdir -p /app/data /app/logs && chown -R 10001:10001 /app
 COPY --from=build /build/target/api-spring-0.0.1-SNAPSHOT.jar /app/app.jar
 USER 10001:10001

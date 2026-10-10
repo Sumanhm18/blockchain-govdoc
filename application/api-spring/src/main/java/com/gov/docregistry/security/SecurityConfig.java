@@ -31,6 +31,7 @@ public class SecurityConfig {
   public SecurityFilterChain filterChain(
       HttpSecurity http,
       ObjectMapper mapper,
+      org.springframework.beans.factory.ObjectProvider<JwtDecoder> decoders,
       @Value("${registry.auth.mode:basic}") String mode,
       @Value("${registry.auth.users-file:.runtime/secrets/users.json}") Path users,
       @Value("${registry.auth.issuer-uri:}") String issuer,
@@ -97,10 +98,7 @@ public class SecurityConfig {
       http.userDetailsService(new InMemoryUserDetailsManager(accounts))
           .httpBasic(c -> c.realmName("Government document registry"));
     } else if (mode.equals("jwt")) {
-      if (!issuer.startsWith("https://"))
-        throw new IllegalStateException("JWT issuer must use HTTPS");
-      NimbusJwtDecoder decoder = JwtDecoders.fromIssuerLocation(issuer);
-      decoder.setJwtValidator(tokenValidator(issuer, audience, department));
+      JwtDecoder decoder = decoders.getObject();
       JwtGrantedAuthoritiesConverter roles = new JwtGrantedAuthoritiesConverter();
       roles.setAuthoritiesClaimName("roles");
       roles.setAuthorityPrefix("ROLE_");
@@ -116,11 +114,29 @@ public class SecurityConfig {
     return http.build();
   }
 
+  @Bean
+  @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+      name = "registry.auth.mode",
+      havingValue = "jwt")
+  public JwtDecoder jwtDecoder(
+      @Value("${registry.auth.issuer-uri:}") String issuer,
+      @Value("${registry.auth.audience:govdoc-api}") String audience,
+      @Value("${registry.issuer:Org1}") String department) {
+    if (!issuer.startsWith("https://"))
+      throw new IllegalStateException("JWT issuer must use HTTPS");
+    NimbusJwtDecoder decoder = JwtDecoders.fromIssuerLocation(issuer);
+    decoder.setJwtValidator(tokenValidator(issuer, audience, department));
+    return decoder;
+  }
+
   static OAuth2TokenValidator<Jwt> tokenValidator(
       String issuer, String audience, String department) {
     OAuth2TokenValidator<Jwt> claims =
         jwt ->
-            jwt.getAudience().contains(audience)
+            jwt.getSubject() != null
+                    && !jwt.getSubject().isBlank()
+                    && jwt.getSubject().length() <= 256
+                    && jwt.getAudience().contains(audience)
                     && department.equals(jwt.getClaimAsString("department"))
                 ? OAuth2TokenValidatorResult.success()
                 : OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token"));

@@ -13,7 +13,12 @@ public final class Requests {
       @NotBlank @Pattern(regexp = HASH) String hash,
       @Size(max = 128) String issuer,
       @Size(max = 128) String subject,
-      @Size(max = 16384) String metadataJson) {}
+      @Size(max = 16384) String metadataJson,
+      @Size(max = 256) String ownerSubject) {
+    public Register(String docId, String hash, String issuer, String subject, String metadataJson) {
+      this(docId, hash, issuer, subject, metadataJson, null);
+    }
+  }
 
   public record Verify(@NotBlank @Pattern(regexp = HASH) String hash) {}
 

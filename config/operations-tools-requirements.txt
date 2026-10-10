@@ -1,0 +1,3 @@
+# Install in an isolated operator tool environment; never in the application runtime.
+cryptography==50.0.2
+git-filter-repo==2.47.0

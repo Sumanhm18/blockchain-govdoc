@@ -22,6 +22,7 @@ public class DocumentService {
   private final ObjectMapper mapper;
   private final String issuer;
   private final int maxBytes;
+  private final String ownershipIssuer;
 
   public DocumentService(
       DocumentLedger ledger,
@@ -30,7 +31,8 @@ public class DocumentService {
       UploadJournal journal,
       ObjectMapper mapper,
       @Value("${registry.issuer:Org1}") String issuer,
-      @Value("${registry.upload.max-bytes:10485760}") int maxBytes) {
+      @Value("${registry.upload.max-bytes:10485760}") int maxBytes,
+      @Value("${registry.auth.issuer-uri:}") String ownershipIssuer) {
     this.ledger = ledger;
     this.ipfs = ipfs;
     this.crypto = crypto;
@@ -38,20 +40,32 @@ public class DocumentService {
     this.mapper = mapper;
     this.issuer = issuer;
     this.maxBytes = maxBytes;
+    this.ownershipIssuer = ownershipIssuer;
   }
 
   public JsonNode register(Requests.Register request) {
     checkIssuer(request.issuer());
     ObjectNode metadata = metadata(request.metadataJson() == null ? "{}" : request.metadataJson());
-    for (String key : List.of("registrationId", "encryption", "ipfsCid"))
+    for (String key : List.of("registrationId", "encryption", "ipfsCid", "ownerSubjectHash"))
       if (metadata.has(key))
         throw RegistryException.validation("Storage metadata is managed by the upload endpoint");
+    addOwner(metadata, request.ownerSubject());
     return ledger.register(
         request.docId(), request.hash(), issuer, orEmpty(request.subject()), metadata.toString());
   }
 
   public synchronized JsonNode upload(
       String id, String requestedIssuer, String subject, String type, MultipartFile file) {
+    return upload(id, requestedIssuer, subject, type, null, file);
+  }
+
+  public synchronized JsonNode upload(
+      String id,
+      String requestedIssuer,
+      String subject,
+      String type,
+      String ownerSubject,
+      MultipartFile file) {
     checkIssuer(requestedIssuer);
     byte[] bytes = bytes(file);
     String mediaType = mediaType(bytes);
@@ -65,6 +79,7 @@ public class DocumentService {
     ObjectNode meta = request.putObject("metadata");
     meta.put("type", orEmpty(type));
     meta.put("mediaType", mediaType);
+    addOwner(meta, ownerSubject);
     String fingerprint = DocumentCrypto.hash(request.toString().getBytes(StandardCharsets.UTF_8));
     Optional<UploadJournal.Job> prior = journal.find(id);
     if (prior.isPresent()) {
@@ -241,6 +256,13 @@ public class DocumentService {
     } catch (java.io.IOException e) {
       throw RegistryException.validation("Metadata must be valid JSON without duplicate fields");
     }
+  }
+
+  private void addOwner(ObjectNode metadata, String subject) {
+    if (subject != null && !subject.isBlank())
+      metadata.put(
+          "ownerSubjectHash",
+          com.gov.docregistry.security.DocumentAccess.ownerHash(ownershipIssuer, subject));
   }
 
   private void checkIssuer(String value) {

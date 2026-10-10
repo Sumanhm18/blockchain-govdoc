@@ -45,7 +45,9 @@ class DocumentServiceTest {
         new JdbcTemplate(
             new DriverManagerDataSource("jdbc:h2:file:" + temp.resolve("journal"), "sa", ""));
     journal = new UploadJournal(jdbc);
-    service = new DocumentService(ledger, ipfs, crypto, journal, mapper, "Org1", 10485760);
+    service =
+        new DocumentService(
+            ledger, ipfs, crypto, journal, mapper, "Org1", 10485760, "https://identity.example");
     when(ledger.get(anyString()))
         .thenThrow(new RegistryException("NOT_FOUND", HttpStatus.NOT_FOUND, "Document not found"));
     when(ipfs.addBytes(any(), anyString())).thenReturn(cid);
@@ -101,7 +103,8 @@ class DocumentServiceTest {
     // Reopen persistent storage as if the process restarted.
     UploadJournal reopened = new UploadJournal(jdbc);
     DocumentService restarted =
-        new DocumentService(ledger, ipfs, crypto, reopened, mapper, "Org1", 10485760);
+        new DocumentService(
+            ledger, ipfs, crypto, reopened, mapper, "Org1", 10485760, "https://identity.example");
     doReturn(committed[0]).when(ledger).get("DOC-001");
     assertEquals("DOC-001", restarted.advance("DOC-001").path("docId").asText());
     verify(ipfs, times(1)).addBytes(any(), anyString());
@@ -199,5 +202,21 @@ class DocumentServiceTest {
         assertThrows(RegistryException.class, () -> service.upload("DOC-001", "", "", "", large))
             .code());
     verifyNoInteractions(ipfs, ledger);
+  }
+
+  @Test
+  void issuerAssignsHashedOwnerAndOwnershipCannotChangeOnRetry() {
+    var result = service.upload("DOC-001", "", "", "", "citizen-id", upload());
+    assertEquals(
+        com.gov.docregistry.security.DocumentAccess.ownerHash(
+            "https://identity.example", "citizen-id"),
+        result.path("metadata").path("ownerSubjectHash").asText());
+    assertFalse(result.toString().contains("citizen-id"));
+    assertEquals(
+        "DUPLICATE",
+        assertThrows(
+                RegistryException.class,
+                () -> service.upload("DOC-001", "", "", "", "another-citizen", upload()))
+            .code());
   }
 }

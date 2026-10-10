@@ -70,6 +70,13 @@ class DocumentApiTest {
   @BeforeEach
   void resetJournal() {
     jdbc.execute("DELETE FROM upload_jobs");
+    when(ledger.get(anyString()))
+        .thenReturn(
+            mapper
+                .createObjectNode()
+                .put("docId", "DOC-001")
+                .put("issuer", "Org1")
+                .put("issuerMspId", "Org1MSP"));
   }
 
   @Test
@@ -85,7 +92,13 @@ class DocumentApiTest {
 
   @Test
   void configuredBasicCredentialsAuthenticate() throws Exception {
-    when(ledger.get("DOC-001")).thenReturn(mapper.createObjectNode().put("docId", "DOC-001"));
+    when(ledger.get("DOC-001"))
+        .thenReturn(
+            mapper
+                .createObjectNode()
+                .put("docId", "DOC-001")
+                .put("issuer", "Org1")
+                .put("issuerMspId", "Org1MSP"));
     mvc.perform(
             get("/api/documents/DOC-001").with(httpBasic("test-reader", "test-only-passphrase")))
         .andExpect(status().isOk());
@@ -113,7 +126,12 @@ class DocumentApiTest {
   @WithMockUser(roles = "ISSUER")
   void registrationPreservesRouteAndJsonResponse() throws Exception {
     when(ledger.register(eq("DOC-001"), eq(HASH), eq("Org1"), eq(""), eq("{}")))
-        .thenReturn(mapper.createObjectNode().put("docId", "DOC-001"));
+        .thenReturn(
+            mapper
+                .createObjectNode()
+                .put("docId", "DOC-001")
+                .put("issuer", "Org1")
+                .put("issuerMspId", "Org1MSP"));
     mvc.perform(
             post("/api/documents")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -146,6 +164,8 @@ class DocumentApiTest {
         mapper
             .createObjectNode()
             .put("docId", "DOC-001")
+            .put("issuer", "Org1")
+            .put("issuerMspId", "Org1MSP")
             .put("hash", HASH)
             .put("issuer", "OtherDepartment")
             .toString();
@@ -247,5 +267,13 @@ class DocumentApiTest {
 
   private String registerBody(String id, String hash) {
     return mapper.createObjectNode().put("docId", id).put("hash", hash).toString();
+  }
+
+  @Test
+  @WithMockUser(roles = "OPERATOR")
+  void operatorCanObservePendingUploadGauge() throws Exception {
+    mvc.perform(get("/actuator/metrics/registry.upload.pending"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.measurements[0].value").value(0));
   }
 }
