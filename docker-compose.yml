@@ -1,89 +1,58 @@
-version: '3.8'
-
+name: govdoc-dev-app
 services:
-  # Hyperledger Fabric Network
-  orderer:
-    image: hyperledger/fabric-orderer:latest
-    container_name: orderer.example.com
-    environment:
-      - FABRIC_LOGGING_SPEC=INFO
-      - ORDERER_GENERAL_LISTENADDRESS=0.0.0.0
-      - ORDERER_GENERAL_GENESISPROFILE=SampleDevModeEtcdRaft
-      - ORDERER_GENERAL_LOCALMSPID=OrdererMSP
-      - ORDERER_GENERAL_TLS_ENABLED=true
-    ports:
-      - "7050:7050"
-    volumes:
-      - ./fabric-samples/test-network/organizations/ordererOrganizations:/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations
-    command: orderer
-
-  peer0-org1:
-    image: hyperledger/fabric-peer:latest
-    container_name: peer0.org1.example.com
-    environment:
-      - CORE_PEER_ID=peer0.org1.example.com
-      - CORE_PEER_ADDRESS=peer0.org1.example.com:7051
-      - CORE_PEER_LISTENADDRESS=0.0.0.0:7051
-      - CORE_PEER_CHAINCODEADDRESS=peer0.org1.example.com:7052
-      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.org1.example.com:7051
-      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.org1.example.com:7051
-      - CORE_PEER_LOCALMSPID=Org1MSP
-      - CORE_PEER_TLS_ENABLED=true
-    ports:
-      - "7051:7051"
-    volumes:
-      - ./fabric-samples/test-network/organizations/peerOrganizations:/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations
-    depends_on:
-      - orderer
-
-  peer0-org2:
-    image: hyperledger/fabric-peer:latest
-    container_name: peer0.org2.example.com
-    environment:
-      - CORE_PEER_ID=peer0.org2.example.com
-      - CORE_PEER_ADDRESS=peer0.org2.example.com:9051
-      - CORE_PEER_LISTENADDRESS=0.0.0.0:9051
-      - CORE_PEER_CHAINCODEADDRESS=peer0.org2.example.com:9052
-      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.org2.example.com:9051
-      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.org2.example.com:9051
-      - CORE_PEER_LOCALMSPID=Org2MSP
-      - CORE_PEER_TLS_ENABLED=true
-    ports:
-      - "9051:9051"
-    volumes:
-      - ./fabric-samples/test-network/organizations/peerOrganizations:/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations
-    depends_on:
-      - orderer
-
-  # IPFS Node
   ipfs:
-    image: ipfs/go-ipfs:latest
-    container_name: ipfs-node
+    image: ipfs/kubo:v0.43.1@sha256:b293923d66e490e70ced64df42ea7a6cf7eac2740e3fb29101df18070fa7be48
     ports:
-      - "4001:4001"
-      - "5001:5001"
-      - "8080:8080"
+      - "127.0.0.1:15001:5001"
+    environment:
+      IPFS_PROFILE: server
     volumes:
       - ipfs-data:/data/ipfs
-    command: daemon --migrate=true --enable-gc
-
-  # Spring Boot API
+    networks: [storage]
+    healthcheck:
+      test: ["CMD", "ipfs", "id"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
   api:
     build:
       context: ./application/api-spring
-      dockerfile: Dockerfile
-    container_name: document-registry-api
+    user: "${REGISTRY_UID:-10001}:${REGISTRY_GID:-10001}"
     ports:
-      - "8081:8081"
+      - "127.0.0.1:18081:8081"
     environment:
-      - SPRING_PROFILES_ACTIVE=production
-      - IPFS_API_BASE=http://ipfs:5001
-    depends_on:
-      - peer0-org1
-      - peer0-org2
-      - ipfs
+      REGISTRY_BIND_ADDRESS: 0.0.0.0
+      REGISTRY_AUTH_MODE: basic
+      REGISTRY_REQUIRE_HTTPS: "false"
+      IPFS_API_BASE: http://ipfs:5001
+      FABRIC_PEER: peer0.org1.example.com:7051
+      FABRIC_AUTHORITY: peer0.org1.example.com
+      FABRIC_CERT: /run/identity/signcerts/cert.pem
+      FABRIC_KEY: /run/identity/keystore/key.pem
+      FABRIC_TLS_CERT: /run/identity/tls-ca.pem
+      REGISTRY_USERS_FILE: /run/secrets/users.json
+      REGISTRY_KEYS_FILE: /run/secrets/encryption.json
+      REGISTRY_DATABASE_URL: jdbc:h2:file:/app/data/registry;DB_CLOSE_ON_EXIT=FALSE
     volumes:
-      - ./logs:/app/logs
-
+      - ./.runtime/identity:/run/identity:ro
+      - ./.runtime/secrets/users.json:/run/secrets/users.json:ro
+      - ./.runtime/secrets/encryption.json:/run/secrets/encryption.json:ro
+      - ./.runtime/data:/app/data
+      - ./.runtime/logs/api:/app/logs
+    networks: [fabric, storage]
+    depends_on:
+      ipfs:
+        condition: service_healthy
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs: [/tmp]
+    restart: unless-stopped
+networks:
+  fabric:
+    external: true
+    name: govdoc_dev
+  storage:
 volumes:
   ipfs-data:

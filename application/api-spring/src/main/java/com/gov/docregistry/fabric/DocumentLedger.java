@@ -1,0 +1,17 @@
+package com.gov.docregistry.fabric;
+
+import com.fasterxml.jackson.databind.JsonNode;
+
+public interface DocumentLedger {
+  JsonNode register(String docId, String hash, String issuer, String subject, String metadataJson);
+
+  JsonNode get(String docId);
+
+  JsonNode verify(String docId, String hash);
+
+  JsonNode revoke(String docId, String reason);
+
+  JsonNode history(String docId);
+
+  void ping();
+}

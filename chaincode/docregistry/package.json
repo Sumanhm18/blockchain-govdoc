@@ -1,14 +1,18 @@
 {
   "name": "docregistry",
-  "version": "1.0.1",
+  "version": "2.1.0",
   "description": "Hyperledger Fabric chaincode for government document registry",
   "main": "index.js",
   "license": "Apache-2.0",
   "scripts": {
-    "start": "fabric-chaincode-node start"
+    "start": "fabric-chaincode-node start",
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
-    "fabric-contract-api": "^2.5.0",
-    "fabric-shim": "^2.5.0"
+    "fabric-contract-api": "2.5.8",
+    "fabric-shim": "2.5.8"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

@@ -1,224 +1,43 @@
-# Government Document Registry - Testing Summary
+# Validation record
 
-## Overview
-This document provides a comprehensive summary of the government document registry system built using Hyperledger Fabric, Spring Boot, and IPFS.
+Validated locally on 10 October 2026 using macOS arm64, Docker Desktop, a fresh isolated Fabric development network, IPFS and synthetic documents only. No external government deployment was tested.
 
-## System Architecture
+## Automated suites
 
-### 1. Hyperledger Fabric Network
-- **Network**: 2 organizations (Org1, Org2) with 1 peer each
-- **Channel**: `govchannel`
-- **Chaincode**: `docregistry` (JavaScript/Node.js)
-- **Consensus**: Raft ordering service
-- **TLS**: Enabled for production security
+| Check | Result / coverage |
+|---|---|
+| Java Maven suite | 32 tests pass: HTTP authentication/roles/validation/errors, JWT claim validation, account/IP limits, structured IPFS responses/failures/limits, encryption and tampering, durable recovery, duplicate handling, revoked download and Gateway dependency compatibility |
+| Node contract suite | 15 tests pass: registration, issuer attributes, cross-department/MSP denial, duplicates, missing IDs, validation, matching/mismatching/revoked outcomes, deterministic metadata, post-2038 timestamps, history and Fabric dispatcher argument count |
+| Live API/IPFS/Fabric | 16 checks pass: authenticated upload, encrypted IPFS bytes, verified plaintext download, hash/file verification, revocation, duplicates, missing records and history |
+| Direct Fabric authorization | 2 checks pass: unattributed identity and department impersonation rejected without relying on HTTP security |
+| Live outage/restart recovery | Pass: IPFS failure, durable staging, API restart, automatic recovery, exact download and no duplicate registration |
+| Repeat deployment | Pass: rerunning `deploy.sh` preserves the existing development state and returns readiness |
+| Container build | Multi-stage build passes Maven tests on Java 17; API starts as a non-root user with read-only root filesystem and secret mounts |
+| npm audit | No advisories reported for the locked chaincode dependency graph at validation time |
+| Source hygiene | Private-key/generated-artifact pattern check and `git diff --check` pass |
 
-### 2. Chaincode Functions
-The `docregistry` chaincode implements the following functions:
+The API workflow passed both with a host-run Java process and the containerized API. Runtime validation found and fixed a Protobuf BOM conflict, peer TLS trust-root selection, isolated CA certificate path references, and JavaScript default-parameter arity that Fabric uses to construct transaction metadata. These issues demonstrate why mock-only tests were insufficient.
 
-#### `registerDocument(docId, hash, issuer, subject, metadataJson)`
-- Registers a new document in the blockchain
-- Validates document ID uniqueness
-- Stores document metadata and hash
-- Returns transaction timestamp
+## Recovery scenario
 
-#### `getDocument(docId)`
-- Retrieves document information by ID
-- Returns document details including hash, issuer, subject, metadata, and status
+`python3 scripts/test-recovery.py` requires the running `./deploy.sh` container stack. It checks project ownership before stopping only this project's IPFS container, uploads a synthetic PDF and expects durable HTTP 202/STAGING, restarts the API, restores IPFS in a finally block, then checks automatic confirmation, exact decrypted bytes, identical-request retry and a single registration history event. It revokes its synthetic record at the end. This scenario passed against the containerized stack.
 
-#### `verifyDocument(docId, hash)`
-- Verifies document integrity by comparing provided hash with stored hash
-- Returns verification result (true/false)
+Unit tests also cover the distinct uncertain-commit case: Fabric commits but the caller receives a dependency error; reopening the journal and observing the matching record confirms it without uploading or submitting again. That particular post-commit network fault is simulated in the unit suite, not injected into the live orderer connection.
 
-#### `revokeDocument(docId, reason)`
-- Revokes a document by marking it as revoked
-- Stores revocation reason and timestamp
-- Prevents further verification
+## Reproduce
 
-### 3. Spring Boot API
-- **Port**: 8081 (to avoid conflict with IPFS gateway on 8080)
-- **Framework**: Spring Boot 2.7.0
-- **Dependencies**: Fabric Gateway Java SDK, OkHttp for IPFS
-
-#### REST Endpoints
-
-##### `POST /api/documents`
-Register a new document
-```json
-{
-  "docId": "DOC-001",
-  "hash": "sha256:abc123...",
-  "issuer": "Ministry of Health",
-  "subject": "John Doe",
-  "metadataJson": "{\"type\":\"passport\",\"issueDate\":\"2024-01-01\"}"
-}
+```sh
+npm ci --prefix chaincode/docregistry
+npm test --prefix chaincode/docregistry
+mvn -B -f application/api-spring/pom.xml verify
+python3 scripts/check-secrets.py
+./deploy.sh
+./test_demo.sh
+python3 scripts/test-recovery.py
 ```
 
-##### `GET /api/documents/{docId}`
-Retrieve document information
-```json
-{
-  "docId": "DOC-001",
-  "hash": "sha256:abc123...",
-  "issuer": "Ministry of Health",
-  "subject": "John Doe",
-  "metadata": {"type":"passport","issueDate":"2024-01-01"},
-  "status": "active",
-  "registeredAt": "2024-01-01T10:00:00Z"
-}
-```
+CI definitions are included for source checks and a manually invoked full development integration run. They have not yet run on GitHub because these changes have not been pushed. Runtime logs contain private CA/bootstrap material and are intentionally excluded from CI artifacts.
 
-##### `POST /api/documents/{docId}/verify`
-Verify document integrity
-```json
-{
-  "hash": "sha256:abc123..."
-}
-```
+## Not established by these tests
 
-##### `POST /api/documents/{docId}/revoke`
-Revoke a document
-```json
-{
-  "reason": "Document expired"
-}
-```
-
-##### `POST /api/documents/upload`
-Upload file to IPFS and register on blockchain
-- **Content-Type**: `multipart/form-data`
-- **Field**: `file` (the document file)
-- **Field**: `docId` (document identifier)
-- **Field**: `issuer` (issuing authority)
-- **Field**: `subject` (document subject)
-
-### 4. IPFS Integration
-- **Purpose**: Decentralized storage for actual document files
-- **API**: HTTP API on port 5001
-- **Storage**: Files stored with Content Identifiers (CIDs)
-- **Integration**: Spring Boot service uploads files and stores CID in blockchain
-
-## Current Status
-
-### ✅ Completed Features
-
-1. **Fabric Network Setup**
-   - Network bootstrap script (`scripts/bootstrap.sh`)
-   - Network management script (`scripts/network.sh`)
-   - Channel creation and peer joining
-   - Chaincode packaging and deployment
-
-2. **Chaincode Implementation**
-   - Complete JavaScript chaincode with all required functions
-   - Proper error handling and validation
-   - Deterministic transaction processing
-
-3. **Spring Boot API**
-   - Complete REST API implementation
-   - Fabric Gateway integration
-   - IPFS service integration
-   - Global exception handling
-   - Proper HTTP status codes
-
-4. **IPFS Integration**
-   - File upload service
-   - CID generation and storage
-   - Integration with blockchain registration
-
-5. **Documentation**
-   - Comprehensive README files
-   - API documentation
-   - Setup and configuration guides
-
-### ⚠️ Current Issues
-
-1. **TLS Configuration**
-   - Spring Boot API has TLS certificate trust issues
-   - Need to properly configure TLS certificates for production
-   - Currently using insecure connection for testing
-
-2. **Network Connectivity**
-   - Some connection issues between Spring Boot and Fabric network
-   - May be related to Docker networking or TLS configuration
-
-3. **Node.js Client**
-   - Access denied errors when connecting to Fabric network
-   - May need proper identity enrollment
-
-### 🔧 Technical Details
-
-#### Dependencies
-- **Fabric**: v2.5.12
-- **Fabric Gateway Java SDK**: 1.5.0
-- **Spring Boot**: 2.7.0
-- **Java**: 11+
-- **Node.js**: 16+
-- **Docker**: Latest
-
-#### File Structure
-```
-fabric/
-├── scripts/                    # Network management scripts
-├── chaincode/docregistry/      # Chaincode implementation
-├── application/
-│   ├── client/                 # Node.js client
-│   └── api-spring/            # Spring Boot API
-├── fabric-samples/            # Fabric samples (cloned)
-└── README.md                  # Main documentation
-```
-
-## Testing Results
-
-### ✅ Successful Tests
-1. **Fabric Network**: Successfully starts and runs
-2. **Chaincode Deployment**: Successfully deployed to both peers
-3. **Spring Boot API**: Starts and responds to requests
-4. **Error Handling**: Proper HTTP status codes for different error scenarios
-
-### ⚠️ Pending Tests
-1. **End-to-End Document Registration**: Blocked by TLS/connectivity issues
-2. **IPFS Integration**: Needs IPFS node running
-3. **Document Verification**: Requires successful registration first
-4. **Document Revocation**: Requires successful registration first
-
-## Next Steps
-
-### Immediate Actions
-1. **Fix TLS Configuration**
-   - Properly configure TLS certificates for Spring Boot
-   - Test secure connections to Fabric network
-
-2. **Resolve Connectivity Issues**
-   - Debug network connection problems
-   - Ensure proper Docker networking
-
-3. **Complete End-to-End Testing**
-   - Test document registration flow
-   - Test document verification flow
-   - Test document revocation flow
-
-### Production Readiness
-1. **Security Hardening**
-   - Enable TLS for all connections
-   - Implement proper authentication
-   - Add input validation and sanitization
-
-2. **Performance Optimization**
-   - Add connection pooling
-   - Implement caching where appropriate
-   - Add monitoring and logging
-
-3. **Deployment**
-   - Create Docker containers for all components
-   - Add Kubernetes deployment manifests
-   - Implement CI/CD pipeline
-
-## Conclusion
-
-The government document registry system has been successfully architected and implemented with:
-- ✅ Complete blockchain infrastructure
-- ✅ Full-featured REST API
-- ✅ IPFS integration for document storage
-- ✅ Comprehensive error handling
-- ✅ Proper documentation
-
-The main remaining work is resolving the TLS/connectivity issues to enable full end-to-end testing and production deployment.
+Production readiness, external OIDC integration, HSM/KMS integration, certificate-revocation rollout, multi-node failover, multi-instance journal correctness, malicious-file detection, load/latency targets, legal compliance, comprehensive vulnerability absence, third-party penetration testing and disaster recovery are not established. The npm result is point-in-time and does not assess Maven/container/OS dependencies. The source scan is a limited check, not a full history secret audit. Read [Security](docs/SECURITY.md) and [Operations](docs/OPERATIONS.md).

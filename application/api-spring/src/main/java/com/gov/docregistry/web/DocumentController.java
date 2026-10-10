@@ -1,85 +1,98 @@
 package com.gov.docregistry.web;
 
-import com.gov.docregistry.fabric.FabricGatewayService;
-import com.gov.docregistry.ipfs.IpfsService;
-import org.springframework.http.ResponseEntity;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.gov.docregistry.fabric.DocumentLedger;
+import com.gov.docregistry.storage.DocumentService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
+import java.util.Map;
+import org.springframework.http.*;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.security.MessageDigest;
-import java.util.HexFormat;
-import java.util.Map;
-
 @RestController
-@RequestMapping("/api/documents")
+@Validated
+@RequestMapping(value = "/api/documents", produces = MediaType.APPLICATION_JSON_VALUE)
 public class DocumentController {
-	private final FabricGatewayService fabric;
-	private final IpfsService ipfs;
+  private final DocumentLedger ledger;
+  private final DocumentService documents;
 
-	public DocumentController(FabricGatewayService fabric, IpfsService ipfs) {
-		this.fabric = fabric;
-		this.ipfs = ipfs;
-	}
+  public DocumentController(DocumentLedger ledger, DocumentService documents) {
+    this.ledger = ledger;
+    this.documents = documents;
+  }
 
-	@PostMapping
-	public ResponseEntity<String> register(@RequestBody Map<String, Object> body) throws Exception {
-		String docId = (String) body.get("docId");
-		String hash = (String) body.get("hash");
-		String issuer = (String) body.getOrDefault("issuer", "");
-		String subject = (String) body.getOrDefault("subject", "");
-		String metadataJson = (String) body.getOrDefault("metadataJson", "{}");
+  @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
+  @PreAuthorize("hasRole('ISSUER')")
+  public JsonNode register(@Valid @RequestBody Requests.Register request) {
+    return documents.register(request);
+  }
 
-		if (docId == null || docId.isBlank() || hash == null || hash.isBlank()) {
-			return ResponseEntity.badRequest().body("{\"error\":\"docId and hash are required\"}");
-		}
-		return ResponseEntity.ok(fabric.registerDocument(docId, hash, issuer, subject, metadataJson));
-	}
+  @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @PreAuthorize("hasRole('ISSUER')")
+  public JsonNode upload(
+      @RequestPart("file") MultipartFile file,
+      @RequestParam("docId") @Pattern(regexp = Requests.ID) String docId,
+      @RequestParam(value = "issuer", defaultValue = "") @Size(max = 128) String issuer,
+      @RequestParam(value = "subject", defaultValue = "") @Size(max = 128) String subject,
+      @RequestParam(value = "type", defaultValue = "") @Size(max = 64) String type) {
+    return documents.upload(docId, issuer, subject, type, file);
+  }
 
-	@PostMapping("/upload")
-	public ResponseEntity<String> upload(@RequestPart("file") MultipartFile file,
-	                                    @RequestParam("docId") String docId,
-	                                    @RequestParam(value = "issuer", required = false, defaultValue = "") String issuer,
-	                                    @RequestParam(value = "subject", required = false, defaultValue = "") String subject,
-	                                    @RequestParam(value = "type", required = false, defaultValue = "") String type) throws Exception {
-		if (docId == null || docId.isBlank()) {
-			return ResponseEntity.badRequest().body("{\"error\":\"docId is required\"}");
-		}
-		if (file == null || file.isEmpty()) {
-			return ResponseEntity.badRequest().body("{\"error\":\"file is required\"}");
-		}
-		byte[] bytes = file.getBytes();
-		String cid = ipfs.addBytes(bytes, file.getOriginalFilename());
-		MessageDigest md = MessageDigest.getInstance("SHA-256");
-		String sha256Hex = HexFormat.of().formatHex(md.digest(bytes));
-		String metadataJson = String.format("{\"type\":\"%s\",\"ipfsCid\":\"%s\",\"fileName\":\"%s\"}",
-				type, cid, file.getOriginalFilename());
-		String onchain = fabric.registerDocument(docId, "sha256:" + sha256Hex, issuer, subject, metadataJson);
-		return ResponseEntity.ok(onchain);
-	}
+  @GetMapping("/{docId}")
+  @PreAuthorize("hasRole('READER')")
+  public JsonNode get(@PathVariable @Pattern(regexp = Requests.ID) String docId) {
+    return ledger.get(docId);
+  }
 
-	@GetMapping("/{docId}")
-	public ResponseEntity<String> get(@PathVariable String docId) throws Exception {
-		if (docId == null || docId.isBlank()) {
-			return ResponseEntity.badRequest().body("{\"error\":\"docId is required\"}");
-		}
-		return ResponseEntity.ok(fabric.getDocument(docId));
-	}
+  @PostMapping(value = "/{docId}/verify", consumes = MediaType.APPLICATION_JSON_VALUE)
+  @PreAuthorize("hasRole('READER')")
+  public JsonNode verify(
+      @PathVariable @Pattern(regexp = Requests.ID) String docId,
+      @Valid @RequestBody Requests.Verify request) {
+    return ledger.verify(docId, request.hash());
+  }
 
-	@PostMapping("/{docId}/verify")
-	public ResponseEntity<String> verify(@PathVariable String docId, @RequestBody Map<String, Object> body) throws Exception {
-		String hash = (String) body.get("hash");
-		if (docId == null || docId.isBlank() || hash == null || hash.isBlank()) {
-			return ResponseEntity.badRequest().body("{\"error\":\"docId and hash are required\"}");
-		}
-		return ResponseEntity.ok(fabric.verifyDocument(docId, hash));
-	}
+  @PostMapping(value = "/{docId}/verify-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @PreAuthorize("hasRole('READER')")
+  public JsonNode verifyFile(
+      @PathVariable @Pattern(regexp = Requests.ID) String docId,
+      @RequestPart("file") MultipartFile file) {
+    return documents.verifyFile(docId, file);
+  }
 
-	@PostMapping("/{docId}/revoke")
-	public ResponseEntity<String> revoke(@PathVariable String docId, @RequestBody Map<String, Object> body) throws Exception {
-		String reason = (String) body.getOrDefault("reason", "unspecified");
-		if (docId == null || docId.isBlank()) {
-			return ResponseEntity.badRequest().body("{\"error\":\"docId is required\"}");
-		}
-		return ResponseEntity.ok(fabric.revokeDocument(docId, reason));
-	}
+  @PostMapping(value = "/{docId}/revoke", consumes = MediaType.APPLICATION_JSON_VALUE)
+  @PreAuthorize("hasRole('REVOKER')")
+  public JsonNode revoke(
+      @PathVariable @Pattern(regexp = Requests.ID) String docId,
+      @Valid @RequestBody Requests.Revoke request) {
+    return ledger.revoke(docId, request.reason());
+  }
+
+  @GetMapping("/{docId}/history")
+  @PreAuthorize("hasRole('READER')")
+  public JsonNode history(@PathVariable @Pattern(regexp = Requests.ID) String docId) {
+    return ledger.history(docId);
+  }
+
+  @GetMapping("/{docId}/registration")
+  @PreAuthorize("hasRole('ISSUER')")
+  public Map<String, Object> registration(
+      @PathVariable @Pattern(regexp = Requests.ID) String docId) {
+    return documents.registrationStatus(docId);
+  }
+
+  @GetMapping(value = "/{docId}/file", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
+  @PreAuthorize("hasRole('READER')")
+  public ResponseEntity<byte[]> download(
+      @PathVariable @Pattern(regexp = Requests.ID) String docId) {
+    DocumentService.Download file = documents.download(docId);
+    return ResponseEntity.ok()
+        .contentType(MediaType.parseMediaType(file.mediaType()))
+        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + docId + "\"")
+        .header(HttpHeaders.CACHE_CONTROL, "no-store")
+        .body(file.bytes());
+  }
 }

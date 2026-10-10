@@ -1,0 +1,10 @@
+{
+  "hyperledger/fabric-peer:2.5.12": "hyperledger/fabric-peer:2.5.12@sha256:18f7503cfc82f062708f93199d372e3f63b6a1b8ce168f20f387d2ce87aaf2eb",
+  "hyperledger/fabric-orderer:2.5.12": "hyperledger/fabric-orderer:2.5.12@sha256:d33a2714b6628d38a46b2e054d558e002cf2ee991828189741b3417c54e1ac0c",
+  "hyperledger/fabric-ca:1.5.15": "hyperledger/fabric-ca:1.5.15@sha256:1b64dc702bd400e14c8f452dedc0359b7dc06679b751b08937eb2bf2865fed40",
+  "hyperledger/fabric-ccenv:2.5.12": "hyperledger/fabric-ccenv:2.5.12@sha256:14c6cca8d85535d4eb08de66be025d20e953e7deff34e1c90c3e4f4cae7d497f",
+  "hyperledger/fabric-nodeenv:2.5": "hyperledger/fabric-nodeenv:2.5@sha256:17e2d447ca0de5b4e3f6950a1c9b24ecfdeecdd90e111e11d771970d35159bf1",
+  "ipfs/kubo:v0.43.1": "ipfs/kubo:v0.43.1@sha256:b293923d66e490e70ced64df42ea7a6cf7eac2740e3fb29101df18070fa7be48",
+  "library/eclipse-temurin:17-jre-jammy": "library/eclipse-temurin:17-jre-jammy@sha256:8993f1aed8b25fcea7a7047a7949c1866fa558fc6830d938c22c4f13b26be9d7",
+  "library/maven:3.9.11-eclipse-temurin-17": "library/maven:3.9.11-eclipse-temurin-17@sha256:e4a7ace3dc0d645ed97f8d9ad0b0d3f0b14fa8d150138f27f116d7105a639b82"
+}

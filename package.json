@@ -1,21 +1,10 @@
 {
-  "name": "gov-doc-api",
-  "version": "1.0.0",
-  "main": "index.js",
+  "name": "government-document-registry",
+  "private": true,
+  "version": "2.0.0",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
-  "dependencies": {
-    "body-parser": "^2.2.0",
-    "cors": "^2.8.5",
-    "express": "^5.1.0",
-    "fabric-ca-client": "^2.2.20",
-    "fabric-network": "^2.2.20",
-    "ipfs-http-client": "^56.0.3",
-    "multer": "^2.0.2"
+    "test": "npm test --prefix chaincode/docregistry",
+    "test:java": "mvn -B -f application/api-spring/pom.xml test",
+    "check:secrets": "python3 scripts/check-secrets.py"
   }
 }

@@ -1,62 +1,53 @@
-# Hyperledger Fabric: Government Document Registry
+# Government Document Registry
 
-A minimal Hyperledger Fabric test-network setup to register, verify, and revoke government documents on-chain using Node.js chaincode. Uses the official `fabric-samples/test-network` under the hood and deploys custom chaincode from this workspace.
+A development implementation of document registration, encrypted storage, verification and revocation using Spring Boot, Hyperledger Fabric and IPFS. The ledger stores a plaintext SHA-256 digest and limited metadata; IPFS stores AES-256-GCM ciphertext. A matching hash is valid only while the record is not revoked.
 
-## Prerequisites
-- Docker Desktop (8+ GB RAM for Docker recommended)
-- Node.js 18+
-- curl, tar, jq
+This repository is a prototype, not a certified government service. Its Fabric sample network has two organizations, one peer per organization and one Raft orderer. It is not highly available. Blockchain preserves submitted records; it cannot establish whether their original contents are true.
 
-## Quick Start
-```bash
-cd /Users/sumanhm/Downloads/fabric
+## Quick start
 
-# 1) Download Fabric binaries, docker images, and samples (one-time)
-./scripts/bootstrap.sh
+Requirements: macOS or Linux, Docker with Compose, Git, Python 3.12+, and internet access. Node 20+ and Java 17+/Maven are needed only for host-side tests/development. Start Docker first. Run from this directory:
 
-# 2) Start the network and create the channel
-./scripts/network.sh up
-./scripts/network.sh createChannel
-
-# 3) Deploy the document registry chaincode
-./scripts/network.sh deployCC
-
-# 4) Run the sample client
-cd application/client
-npm install
-node index.js
+```sh
+./deploy.sh
+./test_demo.sh
 ```
 
-## Chaincode: `docregistry`
-- registerDocument(docId, hash, issuer, subject, metadataJson)
-- getDocument(docId)
-- verifyDocument(docId, hash)
-- revokeDocument(docId, reason)
+`deploy.sh` initializes the pinned Fabric samples submodule, downloads versioned Fabric tools, generates fresh development credentials and encryption keys, creates an isolated network, deploys the contract, enrolls an attributed issuer identity, and builds the API container with tests. First deployment takes several minutes. Private runtime files and detailed logs remain in ignored `.runtime/`; do not publish that directory. Development account passwords are available locally in `.runtime/secrets/credentials.json`, never in source or command examples.
 
-Example document model:
-```json
-{
-  "docType": "document",
-  "docId": "<string>",
-  "hash": "<sha256 or other>",
-  "issuer": "<ministry/agency>",
-  "subject": "<citizen/company>",
-  "metadata": {"...": "..."},
-  "revoked": false,
-  "revocationReason": ""
-}
+API: `http://127.0.0.1:18081`. Readiness: `/actuator/health/readiness`. The IPFS administrative API is local-only at port 15001. Fabric host ports are 17050/17051/19051; CA ports are 17054/18054/19054. Existing standard Fabric sample containers are not used.
+
+The synthetic integration test registers and revokes a new test record. It checks authorization, encrypted storage/download, hash and file verification, duplicates, missing records and history, plus two direct Fabric authorization checks. Run `python3 scripts/test-recovery.py` against the container stack to exercise an IPFS outage and API restart. It leaves its synthetic record on the development ledger.
+
+## Implemented
+
+- Existing register/get/verify/revoke routes, plus encrypted upload/download, file verification, history and upload status.
+- Fail-closed authentication, method roles, JWT issuer/audience/department validation, issuer attributes checked in chaincode, department-controlled revocation.
+- Actual-byte hashing, bounded PDF/PNG/JPEG signature checks, structured metadata and errors, per-account and preauthentication IP rate limiting and redacted request audit logs.
+- Durable encrypted upload staging with retry/reconciliation across IPFS/Fabric failures and uncertain commit outcomes.
+- External configuration, fresh development identities, pinned dependency/image versions, readiness checks and automated tests.
+
+## Documentation
+
+- [Architecture and trust boundaries](docs/ARCHITECTURE.md)
+- [API contract and compatibility](docs/API.md)
+- [Operation, recovery, backup and rotation](docs/OPERATIONS.md)
+- [Security and historical credential exposure](docs/SECURITY.md)
+- [Validation evidence and remaining work](TESTING_SUMMARY.md)
+
+## Tests without Docker
+
+```sh
+npm ci --prefix chaincode/docregistry
+npm test --prefix chaincode/docregistry
+mvn -B -f application/api-spring/pom.xml verify
+python3 scripts/check-secrets.py
 ```
 
-## Useful
-```bash
-# Stop the network
-./scripts/network.sh down
+CI runs these checks. A separately invoked integration workflow provisions the development stack and runs the synthetic scenario.
 
-# Remove test-network artifacts from fabric-samples
-./scripts/network.sh clean
-```
+## Scope
 
-## Notes
-- Binaries and samples will be placed under `./fabric-bin` and `./fabric-samples`.
-- The connection profile used by the client will be copied to `./application/gateway/connection-org1.json` after `up`.
-- This is a dev/test setup; production needs multiple orgs/orderers, proper CAs, and secure ops.
+Readers in a configured department can read all records accessible through that API, including decrypted downloads. This is role-based access, not citizen ownership enforcement. The API uses one Fabric service identity per department; Fabric records that identity, while application audit logs identify the authenticated account by a stable hash. Deploy separate departmental instances and reviewed Fabric policies before adding departments.
+
+QR codes, a frontend, DID/VC, selective disclosure, zero-knowledge proofs, malware scanning, replicated IPFS, multi-orderer availability and performance benchmarking are not implemented. See the operations and security documents before adapting this development setup for real documents.
