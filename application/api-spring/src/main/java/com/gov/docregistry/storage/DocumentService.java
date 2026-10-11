@@ -1,8 +1,5 @@
 package com.gov.docregistry.storage;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.*;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.gov.docregistry.fabric.DocumentLedger;
 import com.gov.docregistry.ipfs.IpfsService;
 import com.gov.docregistry.web.*;
@@ -12,6 +9,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import tools.jackson.core.JsonParser;
+import tools.jackson.databind.*;
+import tools.jackson.databind.node.ObjectNode;
 
 @Service
 public class DocumentService {
@@ -247,13 +247,16 @@ public class DocumentService {
   }
 
   private ObjectNode metadata(String json) {
-    try (JsonParser parser = mapper.getFactory().createParser(json)) {
-      parser.enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
+    try (JsonParser parser =
+        tools.jackson.core.json.JsonFactory.builder()
+            .enable(tools.jackson.core.StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+            .build()
+            .createParser(json)) {
       JsonNode node = mapper.readTree(parser);
       if (!(node instanceof ObjectNode object) || parser.nextToken() != null)
         throw RegistryException.validation("Metadata must be one JSON object");
       return object;
-    } catch (java.io.IOException e) {
+    } catch (tools.jackson.core.JacksonException e) {
       throw RegistryException.validation("Metadata must be valid JSON without duplicate fields");
     }
   }

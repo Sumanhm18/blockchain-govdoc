@@ -1,7 +1,5 @@
 package com.gov.docregistry.storage;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gov.docregistry.web.RegistryException;
 import java.nio.*;
 import java.nio.charset.StandardCharsets;
@@ -13,6 +11,8 @@ import javax.crypto.spec.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class DocumentCrypto {
@@ -27,7 +27,7 @@ public class DocumentCrypto {
       throws Exception {
     JsonNode config = mapper.readTree(Files.readAllBytes(file));
     activeKey = config.path("activeKeyId").asText();
-    var entries = config.path("keys").fields();
+    var entries = config.path("keys").properties().iterator();
     while (entries.hasNext()) {
       var e = entries.next();
       byte[] key = Base64.getDecoder().decode(e.getValue().asText());

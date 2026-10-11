@@ -44,3 +44,9 @@ for container_id in ids:
         count += 1
 assert count >= 2, 'Expected active registry chaincode on both peers'
 print('PASS: all six managed Fabric services and both chaincode containers use the patched image contents.')
+
+ipfs = inspect('container', 'govdoc-dev-app-ipfs-1')
+assert ipfs['Config']['Labels']['com.docker.compose.project'] == 'govdoc-dev-app'
+assert ipfs['State']['Running'] and ipfs['Image'] == inspect('image', 'govdoc-ipfs:local')['Id'], 'IPFS image is stale'
+assert ipfs['Config']['User'] == '1000:100', 'IPFS must start without root privileges'
+print('PASS: IPFS runs the reviewed image as UID 1000.')

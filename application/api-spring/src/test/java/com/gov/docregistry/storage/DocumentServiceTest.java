@@ -4,8 +4,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import com.fasterxml.jackson.databind.*;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.gov.docregistry.fabric.DocumentLedger;
 import com.gov.docregistry.ipfs.IpfsService;
 import com.gov.docregistry.web.*;
@@ -17,6 +15,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.mock.web.MockMultipartFile;
+import tools.jackson.databind.*;
+import tools.jackson.databind.node.ObjectNode;
 
 class DocumentServiceTest {
   @TempDir Path temp;

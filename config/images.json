@@ -1,8 +1,8 @@
 {
-  "hyperledger/fabric-peer:2.5.12": "hyperledger/fabric-peer:2.5.12@sha256:18f7503cfc82f062708f93199d372e3f63b6a1b8ce168f20f387d2ce87aaf2eb",
-  "hyperledger/fabric-orderer:2.5.12": "hyperledger/fabric-orderer:2.5.12@sha256:d33a2714b6628d38a46b2e054d558e002cf2ee991828189741b3417c54e1ac0c",
-  "hyperledger/fabric-ca:1.5.15": "hyperledger/fabric-ca:1.5.15@sha256:1b64dc702bd400e14c8f452dedc0359b7dc06679b751b08937eb2bf2865fed40",
-  "hyperledger/fabric-ccenv:2.5.12": "hyperledger/fabric-ccenv:2.5.12@sha256:14c6cca8d85535d4eb08de66be025d20e953e7deff34e1c90c3e4f4cae7d497f",
+  "hyperledger/fabric-peer:2.5.16": "hyperledger/fabric-peer:2.5.16@sha256:09ee75042de9983bfde31ca88a5bf033386351f10a990e4c48264ee50172dee0",
+  "hyperledger/fabric-orderer:2.5.16": "hyperledger/fabric-orderer:2.5.16@sha256:e322c57331d37e0a35ffae3cb3d3265a0e852211c0f801f2514cc15b964ffc93",
+  "hyperledger/fabric-ca:1.5.22": "hyperledger/fabric-ca:1.5.22@sha256:a70b6ba64a08b4d856802fe1fa66af9f2e03a26a63ceaff0de7c852ca7178b72",
+  "hyperledger/fabric-ccenv:2.5.16": "hyperledger/fabric-ccenv:2.5.16@sha256:19ea2b3c144055807cac5ad1a0cd19f89753e930e06a4b6b261f12d7087ae3b4",
   "hyperledger/fabric-nodeenv:2.5": "hyperledger/fabric-nodeenv:2.5@sha256:17e2d447ca0de5b4e3f6950a1c9b24ecfdeecdd90e111e11d771970d35159bf1",
   "ipfs/kubo:v0.43.1": "ipfs/kubo:v0.43.1@sha256:b293923d66e490e70ced64df42ea7a6cf7eac2740e3fb29101df18070fa7be48",
   "library/eclipse-temurin:17-jre-jammy": "library/eclipse-temurin:17-jre-jammy@sha256:8993f1aed8b25fcea7a7047a7949c1866fa558fc6830d938c22c4f13b26be9d7",

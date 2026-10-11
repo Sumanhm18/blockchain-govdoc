@@ -1,7 +1,5 @@
 package com.gov.docregistry.fabric;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gov.docregistry.web.RegistryException;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.shaded.io.grpc.netty.GrpcSslContexts;
@@ -15,6 +13,8 @@ import org.hyperledger.fabric.client.identity.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class FabricGatewayService implements DocumentLedger {

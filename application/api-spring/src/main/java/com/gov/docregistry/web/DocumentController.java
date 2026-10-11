@@ -1,6 +1,5 @@
 package com.gov.docregistry.web;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.gov.docregistry.fabric.DocumentLedger;
 import com.gov.docregistry.storage.DocumentService;
 import jakarta.validation.Valid;
@@ -11,6 +10,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import tools.jackson.databind.JsonNode;
 
 @RestController
 @Validated

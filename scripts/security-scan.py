@@ -64,20 +64,27 @@ def main():
         commands = [
             ['bash', 'scripts/build-node-runtime.sh'],
             ['python3', 'scripts/build-fabric-images.py'],
+            ['docker', 'build', '-t', 'govdoc-ipfs:local', '--build-arg',
+             'IPFS_IMAGE=' + pins['ipfs/kubo:v0.43.1'], '-f', 'deploy/ipfs.Dockerfile', 'deploy'],
+            ['docker', 'build', '-t', 'govdoc-postgres:local', '--build-arg',
+             'POSTGRES_IMAGE=' + staging['postgres'], '-f', 'deploy/postgres.Dockerfile', 'deploy'],
             ['docker', 'build', '-t', 'govdoc-staging-api', 'application/api-spring'],
             ['docker', 'build', '-t', 'govdoc-staging-keycloak', '--build-arg',
-             'KEYCLOAK_IMAGE=' + staging['keycloak'], '-f', 'deploy/keycloak.Dockerfile', 'deploy'],
+             'KEYCLOAK_IMAGE=' + staging['keycloak'], '--build-arg',
+             'KEYCLOAK_RUNTIME_IMAGE=' + staging['keycloak_runtime'], '-f', 'deploy/keycloak.Dockerfile', 'deploy'],
         ]
         for index, command in enumerate(commands):
             with (output / f'build-{index}.log').open('w') as log:
                 subprocess.run(command, stdout=log, stderr=log, check=True, timeout=1800, env=env)
     targets = [('source', ['fs', '--skip-dirs', '.runtime', '--skip-dirs', '.git', '--skip-dirs', 'fabric-samples',
                             '--skip-dirs', 'node_modules', '--skip-dirs', 'application/api-spring/target', '.'])]
-    images = [('api', 'govdoc-staging-api'), ('keycloak', 'govdoc-staging-keycloak'), ('postgres', staging['postgres'])]
+    images = [('api', 'govdoc-staging-api'), ('keycloak', 'govdoc-staging-keycloak'), ('postgres', 'govdoc-postgres:local')]
     images += [(name.split('/')[1].split(':')[0], pin) for name, pin in pins.items()
                if name.startswith(('hyperledger/fabric-peer:', 'hyperledger/fabric-orderer:',
                                    'hyperledger/fabric-ca:', 'hyperledger/fabric-nodeenv:', 'ipfs/'))]
     for label, image in images:
+        if label == 'kubo':
+            image = 'govdoc-ipfs:local'
         if label in {'fabric-peer', 'fabric-orderer', 'fabric-ca'}:
             try:
                 patched = json.loads((ROOT / '.runtime/fabric-images.json').read_text())
@@ -89,7 +96,7 @@ def main():
                 image = json.loads((ROOT / '.runtime/node-runtime.json').read_text())['reference']
             except (OSError, ValueError, KeyError):
                 image = ''
-        if label in {'api', 'keycloak', 'fabric-nodeenv', 'fabric-peer', 'fabric-orderer', 'fabric-ca'}:
+        if label in {'api', 'keycloak', 'postgres', 'fabric-nodeenv', 'fabric-peer', 'fabric-orderer', 'fabric-ca', 'kubo'}:
             # Resolve mutable local build tags once, then scan their immutable content IDs.
             try:
                 image = subprocess.check_output(['docker', 'image', 'inspect', '--format', '{{.Id}}', image],

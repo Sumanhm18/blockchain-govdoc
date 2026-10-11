@@ -7,7 +7,8 @@ umask 077
 mkdir -p .runtime/logs
 NODE_IMAGE="$(python3 -c 'import json; print(json.load(open("config/node-runtime.json"))["node"])')"
 FABRIC_NODEENV="$(python3 -c 'import json; print(json.load(open("config/node-runtime.json"))["fabric_nodeenv"])')"
-docker build --build-arg NODE_IMAGE="$NODE_IMAGE" --build-arg FABRIC_NODEENV="$FABRIC_NODEENV" \
+NPM_VERSION="$(python3 -c 'import json; print(json.load(open("config/node-runtime.json"))["npm"])')"
+docker build --build-arg NPM_VERSION="$NPM_VERSION" --build-arg NODE_IMAGE="$NODE_IMAGE" --build-arg FABRIC_NODEENV="$FABRIC_NODEENV" \
   -t govdoc-fabric-nodeenv:build -f deploy/fabric-nodeenv.Dockerfile deploy > .runtime/logs/node-runtime-build.log 2>&1
 IMAGE_ID="$(docker image inspect --format '{{.Id}}' govdoc-fabric-nodeenv:build)"
 IMAGE_REF="govdoc-fabric-nodeenv:${IMAGE_ID#sha256:}"

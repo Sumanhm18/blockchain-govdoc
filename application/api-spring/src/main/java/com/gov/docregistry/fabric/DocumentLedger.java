@@ -1,6 +1,6 @@
 package com.gov.docregistry.fabric;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 
 public interface DocumentLedger {
   JsonNode register(String docId, String hash, String issuer, String subject, String metadataJson);

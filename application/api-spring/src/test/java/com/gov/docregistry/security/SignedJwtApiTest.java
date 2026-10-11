@@ -4,7 +4,6 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gov.docregistry.fabric.DocumentLedger;
 import com.gov.docregistry.ipfs.IpfsService;
 import com.nimbusds.jose.*;
@@ -17,13 +16,14 @@ import java.time.Instant;
 import java.util.*;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.test.context.*;
 import org.springframework.test.context.bean.override.convention.TestBean;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import tools.jackson.databind.ObjectMapper;
 
 @SpringBootTest(
     properties = {
@@ -95,6 +95,14 @@ class SignedJwtApiTest {
     return jwt.serialize();
   }
 
+  private static org.springframework.test.web.servlet.request.RequestPostProcessor https() {
+    return request -> {
+      request.setSecure(true);
+      request.setScheme("https");
+      return request;
+    };
+  }
+
   String valid(List<String> roles) throws Exception {
     return token(
         key,
@@ -115,11 +123,11 @@ class SignedJwtApiTest {
                 .put("issuer", "Org1")
                 .put("issuerMspId", "Org1MSP"));
     String bearer = "Bearer " + valid(List.of("READER"));
-    mvc.perform(get("/api/documents/DOC-001").secure(true).header("Authorization", bearer))
+    mvc.perform(get("/api/documents/DOC-001").with(https()).header("Authorization", bearer))
         .andExpect(status().isOk());
     mvc.perform(
             post("/api/documents/DOC-001/revoke")
-                .secure(true)
+                .with(https())
                 .header("Authorization", bearer)
                 .contentType("application/json")
                 .content("{\"reason\":\"test\"}"))
@@ -150,7 +158,7 @@ class SignedJwtApiTest {
                 Instant.now().minusSeconds(300)));
     for (String jwt : tokens)
       mvc.perform(
-              get("/api/documents/DOC-001").secure(true).header("Authorization", "Bearer " + jwt))
+              get("/api/documents/DOC-001").with(https()).header("Authorization", "Bearer " + jwt))
           .andExpect(status().isUnauthorized());
     verifyNoInteractions(ledger);
   }
@@ -159,7 +167,7 @@ class SignedJwtApiTest {
   void validTokenWithoutReadRoleIsDenied() throws Exception {
     mvc.perform(
             get("/api/documents/DOC-001")
-                .secure(true)
+                .with(https())
                 .header("Authorization", "Bearer " + valid(List.of("OPERATOR"))))
         .andExpect(status().isForbidden());
     verifyNoInteractions(ledger);
@@ -195,20 +203,20 @@ class SignedJwtApiTest {
             DocumentAccess.ownerHash("https://identity.example", "someone-else"));
     when(ledger.get("DOC-002")).thenReturn(other);
     String auth = "Bearer " + valid(List.of("CITIZEN"));
-    mvc.perform(get("/api/documents/DOC-001").secure(true).header("Authorization", auth))
+    mvc.perform(get("/api/documents/DOC-001").with(https()).header("Authorization", auth))
         .andExpect(status().isOk());
-    mvc.perform(get("/api/documents/DOC-002").secure(true).header("Authorization", auth))
+    mvc.perform(get("/api/documents/DOC-002").with(https()).header("Authorization", auth))
         .andExpect(status().isNotFound());
-    mvc.perform(get("/api/documents/DOC-002/file").secure(true).header("Authorization", auth))
+    mvc.perform(get("/api/documents/DOC-002/file").with(https()).header("Authorization", auth))
         .andExpect(status().isNotFound());
     mvc.perform(
             post("/api/documents/DOC-002/verify")
-                .secure(true)
+                .with(https())
                 .header("Authorization", auth)
                 .contentType("application/json")
                 .content("{\"hash\":\"sha256:" + "a".repeat(64) + "\"}"))
         .andExpect(status().isNotFound());
-    mvc.perform(get("/api/documents/DOC-001/history").secure(true).header("Authorization", auth))
+    mvc.perform(get("/api/documents/DOC-001/history").with(https()).header("Authorization", auth))
         .andExpect(status().isForbidden());
     verifyNoInteractions(ipfs);
   }
@@ -220,7 +228,7 @@ class SignedJwtApiTest {
     when(ledger.get("DOC-001")).thenReturn(other);
     mvc.perform(
             get("/api/documents/DOC-001")
-                .secure(true)
+                .with(https())
                 .header("Authorization", "Bearer " + valid(List.of("READER"))))
         .andExpect(status().isNotFound());
   }
@@ -228,11 +236,11 @@ class SignedJwtApiTest {
   @Test
   void restApiDoesNotExposeViewOrSseRendering() throws Exception {
     String auth = "Bearer " + valid(List.of("READER"));
-    mvc.perform(get("/unmapped-view").secure(true).header("Authorization", auth))
+    mvc.perform(get("/unmapped-view").with(https()).header("Authorization", auth))
         .andExpect(status().isNotFound());
     mvc.perform(
             get("/api/documents/DOC-001")
-                .secure(true)
+                .with(https())
                 .header("Authorization", auth)
                 .accept("text/event-stream"))
         .andExpect(status().isNotAcceptable());

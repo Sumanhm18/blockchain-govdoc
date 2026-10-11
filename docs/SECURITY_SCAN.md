@@ -1,28 +1,25 @@
 # Security scan record — 11 October 2026
 
-Trivy 0.75.0 was verified against its published release checksum and used for the source dependency graph and API/Keycloak operating-system packages. JSON reports are retained under ignored `.runtime/trivy-*.json`; they are point-in-time evidence, not a guarantee of vulnerability absence. No finding is suppressed by an ignore file.
+Trivy 0.75.0 was checked against its published release checksum. Current source and full OS/library image results are recorded in [Security gate](SECURITY_GATE.md). Restricted raw reports remain under ignored `.runtime/security/`; these are point-in-time package findings, not proof of exploitability or vulnerability absence. No finding is suppressed by an ignore file.
 
-## Application dependencies
+## API framework remediation
 
-Updated Jackson to 2.21.7, Tomcat to 10.1.60 and Log4j to 2.25.5. All 41 Java tests pass with these versions. The rescanned source graph retains two findings against Spring MVC 6.2.19:
+The API now uses Spring Boot 4.1.1 / Spring Framework 7.0.9 on Java 17, with Jackson 3.1.7, the Jackson 2 compatibility BOM at 2.21.7, Tomcat 11.0.26 and Log4j 2.25.5. The upgrade includes Boot's modular MVC/security starters, Jackson 3 imports and duplicate-field parsing, the moved health API and the new HTTPS redirect configuration. All 41 Java tests pass; HTTPS test requests set both a secure connection and an HTTPS URL scheme.
 
-- [CVE-2026-47884](https://spring.io/security/cve-2026-47884/): Spring rates this medium and describes an XsltView/view-rendering prerequisite. This application uses REST controllers and has no XsltView or view-name mapping.
-- [CVE-2026-47890](https://spring.io/security/cve-2026-47890/): Spring rates this low and describes SSE view fragments containing attacker-controlled data. This application does not stream SSE view fragments.
+The patched source dependency graph reports no vulnerabilities. Boot's default Jackson 3.1.5 and Tomcat 11.0.24 had additional findings, so reviewed compatible patch overrides are explicit in the POM. The executable API image is scanned separately; a clean source graph alone is insufficient.
 
-Trivy classifies both as critical. Our applicability assessment is that their documented prerequisites are absent in the current application. HTTP regression checks cover unmapped view paths and rejection of SSE content negotiation, but cannot prove every possible exploit absent. Preserve the findings for release review. Spring lists the 6.2.20 fixes as enterprise-only and 7.0.9 as open source. A supported framework migration or licensed patch remains a release decision; replacing Spring 6 with Spring 7 underneath Boot 3 is not a compatible patch.
+The earlier Spring MVC 6.2.19 findings, [CVE-2026-47884](https://spring.io/security/cve-2026-47884/) and [CVE-2026-47890](https://spring.io/security/cve-2026-47890/), are addressed through the framework upgrade to the listed open-source fixed line. They are not waived based on the application's lack of view/SSE rendering. Existing negative HTTP tests remain.
 
-## Container coverage and limits
+## Runtime remediation
 
-The initial API OS scan found 37 package findings: 1 high, 15 medium and 21 low. The high finding was CVE-2026-84782 in `libssl3` 3.0.2-0ubuntu1.29, with a fix listed in 3.0.2-0ubuntu1.30. The Dockerfile explicitly installs that reviewed version on the pinned base; package indexes are removed from the resulting image. The rebuilt image rescanned with 31 remaining OS package findings (16 low, 15 medium). Rebuild and rescan whenever package pins or the base digest change.
+- API: the pinned Jammy base receives `libssl3=3.0.2-0ubuntu1.30`.
+- Keycloak: the pinned 26.8.0 distribution runs on the pinned Temurin 21 Alpine runtime as UID 1000. Full OS/Java scanning reports only two medium findings.
+- PostgreSQL: major version 17 is retained, moving from Debian to a pinned Alpine image through an encrypted logical backup/restore into a separate volume. The original volume is retained; identity/client/credential fingerprints and OIDC checks pass. The derived runtime starts as UID 70 and removes the old `gosu` helper, whose bundled Go code contained one critical and 24 high findings. See [Identity migration](IDENTITY_MIGRATION.md).
+- Fabric: peers/orderer/build environment move to 2.5.16 and CAs to 1.5.22, with OS patches still applied. Node uses 22.23.3 on Alpine 3.24.2 and npm 12.2.0. See [Runtime patches](RUNTIME_PATCHES.md).
+- IPFS: direct non-root startup permits removal of the obsolete `/sbin/gosu` binary and its bundled vulnerable Go runtime. Remaining IPFS Go findings are retained in the gate.
 
-The pinned Keycloak 26.8.0 base OS scan reports 64 package findings: 6 high, 29 medium and 29 low. The high findings are CVE-2026-103111, CVE-2026-86145 and CVE-2026-89161, each reported against both `pcre2` and `pcre2-syntax` 10.40-6.el9. The scanner lists no fixed version. These remain unresolved and require vendor tracking and exposure review before public deployment.
+## Coverage and remaining work
 
-Container scans are OS-only. A full Keycloak Java scan was stopped during its large, slow Java-index download; its Java dependency coverage is incomplete. The API source scan covers the Maven graph, but does not replace a complete binary/image scan. A subsequent [runtime OS triage and automated gate](SECURITY_GATE.md) adds Fabric and PostgreSQL findings. IPFS returned no OS targets. Full binary/library, host and external-infrastructure coverage remains incomplete. No claim of a clean overall software supply chain is made.
+The Java vulnerability index download completed with its OCI layer SHA-256 verified. Full scans cover OS packages and supported language libraries in each built/pinned runtime image. This does not scan every external service, host, kernel, network configuration or deployed extension. Residual high and unknown findings in the Fabric/Node/IPFS supply chain still require remediation and vendor tracking. A passing functional test is not a vulnerability exemption.
 
-## Reproduction
-
-Install and independently verify Trivy, then scan the source while excluding generated runtime/vendor/build directories. Scan the actual built API and the pinned Keycloak image with `trivy image --pkg-types os --scanners vuln`. Keep scanner databases current and save JSON results with image digests. Run the broader Java/image/infrastructure scans before a production release. npm audit of the locked chaincode graph reported no advisories at this validation point.
-
-Use the committed [security gate](SECURITY_GATE.md) for reproducible scans and the expanded runtime backlog.
-
-The priority Fabric Node/peer/orderer/CA OS fixes are now applied; see [Runtime patches](RUNTIME_PATCHES.md) for before/after evidence and validation.
+Use `./scripts/security-scan.sh --build` to rebuild and rescan. The release gate remains fail-closed on findings, partial coverage and errors. npm audit of the locked application chaincode graph reports no advisories; that result does not cover the Node runtime's bundled npm dependencies.

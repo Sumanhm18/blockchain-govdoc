@@ -2,13 +2,13 @@ package com.gov.docregistry.ipfs;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gov.docregistry.web.RegistryException;
 import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.*;
+import tools.jackson.databind.ObjectMapper;
 
 class IpfsServiceTest {
   HttpServer server;

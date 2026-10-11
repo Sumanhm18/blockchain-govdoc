@@ -28,6 +28,8 @@ Generated credentials stay under `.runtime/staging/private`; certificate authori
 
 `deploy/production-api.compose.yml` is a fail-closed template for an operator-provisioned host, with HTTPS, JWT, explicit identities, mounted secret-store projections and persistent storage. It intentionally has one API replica because the current journal needs single-writer semantics. No cloud account, domain, public certificate, external CA administration endpoint or secret-manager account was supplied. Consequently no internet production deployment, HSM/KMS integration or highly available Fabric/IPFS deployment has been performed.
 
+Existing staging databases use an encrypted logical migration before switching PostgreSQL runtime families; see [Identity migration](IDENTITY_MIGRATION.md).
+
 ## Operational drills
 
 - `scripts/test-backup-restore.py`: encrypted application journal/key/IPFS snapshot, tamper rejection, checksum validation and isolated restored API/IPFS download. Requires the pinned Python `cryptography` tool dependency. Stops and restores only this project's services. It does not restore the Fabric ledger or Keycloak database.
@@ -39,7 +41,7 @@ Encrypted backups are retained in `.runtime/backups`. Their AES-256-GCM wrapping
 
 ## Monitoring and release gates
 
-The [automated security gate](SECURITY_GATE.md) blocks on high/critical/unknown findings and incomplete coverage. Its full scan still needs to finish; the local OS triage found additional runtime-image findings.
+The [automated security gate](SECURITY_GATE.md) blocks on high/critical/unknown findings and incomplete coverage. Full OS/library evidence and residual blockers are recorded there. Main-branch protection requires `Source checks`, `Development integration` and `Security release gate`, with up-to-date branches, administrator enforcement, and force pushes/deletions disabled. Billing prevents hosted checks from running; protections were not bypassed.
 
 Existing OPERATOR-only actuator metrics now include `registry.upload.pending`, `registry.upload.rejected` and `registry.upload.oldest.pending.seconds` (age since the oldest pending job's last update). Integrate these with the organization's monitoring system; alert on sustained backlog, rejected jobs, dependency readiness, capacity, certificate expiry and security failures. No notification destination has been configured.
 

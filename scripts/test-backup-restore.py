@@ -56,7 +56,7 @@ def main():
     info=json.loads(docker('inspect',*containers).stdout)
     if any(c['Config']['Labels'].get('com.docker.compose.project')!='govdoc-dev-app' or not c['State']['Running'] for c in info): raise RuntimeError('Only a running isolated development stack can be backed up')
     ipfs=info[1];volume=next(m['Name'] for m in ipfs['Mounts'] if m['Destination']=='/data/ipfs')
-    image=ipfs['Config']['Image']
+    image=ipfs['Image']
     staging=subprocess.run(['docker','inspect','govdoc-staging-api-1'],env=env,capture_output=True)
     if staging.returncode==0:
         current=json.loads(staging.stdout)[0]
@@ -72,8 +72,10 @@ def main():
             docker('stop',*containers)
             try:
                 shutil.copytree(root/'.runtime/data',snapshot/'data')
-                # The wrapping key is stored separately and must not wrap a copy of itself.
-                shutil.copytree(root/'.runtime/secrets',snapshot/'secrets',ignore=shutil.ignore_patterns('backup-master.key'))
+                # Back up only the API's required secrets, never CA credentials or backup wrapping keys.
+                (snapshot/'secrets').mkdir()
+                for name in ['users.json', 'encryption.json']:
+                    shutil.copyfile(root/'.runtime/secrets'/name, snapshot/'secrets'/name)
                 archive=temp/'ipfs.tar'
                 with archive.open('wb') as output:
                     subprocess.run(['docker','run','--rm','--network','none','--user','0','--mount',f'type=volume,source={volume},target=/source,readonly','--entrypoint','tar',image,'-C','/source','-cf','-','.'],env=env,stdout=output,stderr=subprocess.DEVNULL,check=True,timeout=90)

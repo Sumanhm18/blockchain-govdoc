@@ -1,7 +1,5 @@
 package com.gov.docregistry.security;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.file.*;
 import java.util.*;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,6 +16,8 @@ import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.web.cors.*;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 @Configuration
 @EnableMethodSecurity
@@ -74,7 +74,7 @@ public class SecurityConfig {
                                   "{\"code\":\"FORBIDDEN\",\"message\":\"Operation not"
                                       + " permitted\"}");
                         }));
-    if (https) http.requiresChannel(c -> c.anyRequest().requiresSecure());
+    if (https) http.redirectToHttps(c -> {});
     if (mode.equals("basic")) {
       JsonNode entries = mapper.readTree(Files.readAllBytes(users));
       if (!entries.isArray() || entries.isEmpty())

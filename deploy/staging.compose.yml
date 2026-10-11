@@ -19,6 +19,7 @@ services:
       dockerfile: keycloak.Dockerfile
       args:
         KEYCLOAK_IMAGE: ${KEYCLOAK_IMAGE:?Pinned image required}
+        KEYCLOAK_RUNTIME_IMAGE: ${KEYCLOAK_RUNTIME_IMAGE:?Pinned runtime required}
     command: [start, --optimized, --import-realm]
     env_file: ../.runtime/staging/private/containers.env
     environment:
@@ -83,3 +84,4 @@ networks:
   storage: {external: true, name: govdoc-dev-app_storage}
 volumes:
   keycloak-db:
+    name: ${POSTGRES_VOLUME:-govdoc-staging_keycloak-db-alpine-v1}

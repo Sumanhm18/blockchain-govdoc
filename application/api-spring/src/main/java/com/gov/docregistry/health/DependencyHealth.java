@@ -2,7 +2,7 @@ package com.gov.docregistry.health;
 
 import com.gov.docregistry.fabric.DocumentLedger;
 import com.gov.docregistry.ipfs.IpfsService;
-import org.springframework.boot.actuate.health.*;
+import org.springframework.boot.health.contributor.*;
 import org.springframework.stereotype.Component;
 
 @Component("registryDependencies")

@@ -1,6 +1,5 @@
 package com.gov.docregistry.security;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.gov.docregistry.storage.DocumentCrypto;
 import com.gov.docregistry.web.RegistryException;
 import java.nio.charset.StandardCharsets;
@@ -9,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
 
 @Component
 public class DocumentAccess {

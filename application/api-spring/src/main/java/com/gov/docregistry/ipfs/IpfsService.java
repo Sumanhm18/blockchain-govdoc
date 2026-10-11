@@ -1,11 +1,11 @@
 package com.gov.docregistry.ipfs;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gov.docregistry.web.RegistryException;
 import java.time.Duration;
 import okhttp3.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class IpfsService {

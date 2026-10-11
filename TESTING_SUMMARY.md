@@ -6,7 +6,7 @@ Validated locally on 11 October 2026 using macOS arm64, Docker Desktop, a fresh 
 
 | Check | Result / coverage |
 |---|---|
-| Java Maven suite | 41 tests pass: signed JWT validation, citizen ownership and department isolation, protected metrics, HTTP authentication/roles/validation/errors, JWT claim validation, account/IP limits, structured IPFS responses/failures/limits, encryption and tampering, durable recovery, duplicate handling, revoked download and Gateway dependency compatibility |
+| Java Maven suite | 41 tests pass on Spring Boot 4.1.1, Jackson 3.1.7 and Tomcat 11.0.26: signed JWT validation, citizen ownership and department isolation, protected metrics, HTTP authentication/roles/validation/errors, JWT claim validation, account/IP limits, structured IPFS responses/failures/limits, encryption and tampering, durable recovery, duplicate handling, revoked download and Gateway dependency compatibility |
 | Node contract suite | 15 tests pass: registration, issuer attributes, cross-department/MSP denial, duplicates, missing IDs, validation, matching/mismatching/revoked outcomes, deterministic metadata, post-2038 timestamps, history and Fabric dispatcher argument count |
 | Live API/IPFS/Fabric | 16 checks pass: authenticated upload, encrypted IPFS bytes, verified plaintext download, hash/file verification, revocation, duplicates, missing records and history |
 | Direct Fabric authorization | 2 checks pass: unattributed identity and department impersonation rejected without relying on HTTP security |
@@ -16,7 +16,11 @@ Validated locally on 11 October 2026 using macOS arm64, Docker Desktop, a fresh 
 | Real HTTPS/OIDC staging | 37 checks pass against Keycloak, including token signature/discovery, citizen isolation, ownership retry conflicts and revocation; 20 concurrent-read smoke requests have zero failures |
 | Encrypted restore | Pass: encrypted snapshot, tamper rejection, checksums and exact download from an isolated restored API/IPFS instance |
 | Disposable certificate revocation | Pass: enrollment, CA revocation, signed channel MSP CRL update, revoked identity denial and existing service continuity |
-| Patched runtime deployment | All six Fabric services and both chaincode containers use the patched image contents; live registry checks pass |
+| Patched runtime deployment | Fabric 2.5.16 / CA 1.5.22; all six services and both chaincode containers use the patched image contents. IPFS runs as UID 1000; live checks pass |
+| Identity migration | Encrypted logical PostgreSQL 17 migration preserves identity/client/credential fingerprints; old volume retained; 37 OIDC checks pass after non-root PostgreSQL/Keycloak changes |
+| Fresh data volumes | IPFS initializes as UID 1000 and PostgreSQL as UID 70 without the old gosu helpers |
+| Full security gate | All nine targets scanned; no critical findings. Source/API/Keycloak/PostgreSQL have no high/unknown findings. Fabric/Node/IPFS residual findings correctly block release |
+| Main branch protection | Three required checks, strict branch updates and administrator enforcement enabled; force pushes/deletions disabled |
 | Required endorser outage | Pass: writes fail safely during outage and recover without duplicate registration; this is not HA failover |
 | npm audit | No advisories reported for the locked chaincode dependency graph at validation time |
 | Source hygiene | Private-key/generated-artifact pattern check and `git diff --check` pass |

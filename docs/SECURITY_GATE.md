@@ -9,7 +9,7 @@ python3 scripts/install-trivy.py
 
 The installer downloads Trivy 0.75.0 from its official GitHub release and checks the archive against the platform-specific SHA-256 committed in `config/trivy.json`. It extracts only the scanner binary into ignored `.runtime/tools`. Updating the scanner requires reviewing its release and changing the committed version/checksums together.
 
-The runner builds the API, optimized Keycloak and patched Fabric images without starting services or generating credentials. It resolves local image tags to immutable content IDs, then scans the application source, API, Keycloak, PostgreSQL, Fabric peer/orderer/CA/Node runtime and IPFS. Third-party references come from the committed image pins. Full mode includes OS and supported language dependencies; Trivy may download its large Java index. Build and scanner subprocesses have timeouts.
+The runner builds the API, optimized Keycloak, non-root PostgreSQL/IPFS and patched Fabric images without starting services or generating credentials. It resolves local image tags to immutable content IDs, then scans the application source, API, Keycloak, PostgreSQL, Fabric peer/orderer/CA/Node runtime and IPFS. Third-party references come from the committed image pins. Full mode includes OS and supported language dependencies; Trivy may download its large Java index. Build and scanner subprocesses have timeouts.
 
 Each run creates a new restricted `.runtime/security/<timestamp>-<random>/` directory containing raw JSON inventory/findings, protected diagnostic logs and `summary.json`. Existing reports cannot be mistaken for a fresh successful scan. Repository ignore/config files and inherited `TRIVY_*` environment settings cannot silently suppress results. No vulnerability exclusions or unfixed-finding exemptions are enabled.
 
@@ -21,26 +21,29 @@ Each run creates a new restricted `.runtime/security/<timestamp>-<random>/` dire
 
 Build/install failures also return nonzero. An image with no analyzed targets is incomplete, rather than presumed clean. `--os-only` is available for quick triage but **always returns 2** because language coverage is missing. A passing scanner result alone does not establish production security or satisfy the external gates in [Deployment validation](DEPLOYMENT_VALIDATION.md).
 
-The `Security release gate` GitHub workflow runs on pull requests and manual dispatch. It publishes a compact status in the job summary, without uploading runtime logs or private image metadata. Repository branch-protection settings have not been changed; an administrator must require this check before merging/releasing. GitHub's account billing lock currently prevents hosted execution.
+The `Security release gate` GitHub workflow runs on pull requests and manual dispatch. It publishes a compact status in the job summary, without uploading runtime logs or private image metadata. Main-branch protection now requires `Source checks`, `Development integration` and `Security release gate`, with strict up-to-date status checks and administrator enforcement. Force pushes and deletions are disabled. The PR remains draft and unmerged. GitHub's account billing lock currently prevents hosted execution.
 
-## Local validation and backlog
+## Full local validation and backlog
 
-The OS triage pass scanned the actual API and optimized Keycloak builds plus the pinned runtime images. Counts below are package findings; the same advisory can affect multiple packages or images.
+All nine scans completed on 11 October 2026, including OS packages and supported language libraries. The Java index was downloaded and checked against its OCI layer SHA-256. The release result is **BLOCKED_FINDINGS (exit 1)**, with no incomplete targets or critical findings. Counts are package findings, not distinct exploitable vulnerabilities.
 
 | Target | Critical | High | Medium | Low | Unknown |
 |---|---:|---:|---:|---:|---:|
-| Source dependency graph | 2 | 0 | 0 | 0 | 0 |
-| API OS | 0 | 0 | 15 | 16 | 0 |
-| Keycloak OS | 0 | 6 | 29 | 29 | 0 |
-| PostgreSQL OS | 1 | 63 | 110 | 132 | 11 |
-| Patched Fabric peer OS | 0 | 0 | 155 | 46 | 0 |
-| Patched Fabric orderer OS | 0 | 0 | 155 | 46 | 0 |
-| Patched Fabric CA OS | 0 | 0 | 155 | 46 | 0 |
-| Patched Fabric Node runtime OS | 0 | 0 | 1 | 0 | 0 |
+| source | 0 | 0 | 0 | 0 | 0 |
+| api | 0 | 0 | 15 | 16 | 0 |
+| keycloak | 0 | 0 | 2 | 0 | 0 |
+| postgres | 0 | 0 | 1 | 0 | 0 |
+| fabric-peer | 0 | 57 | 137 | 36 | 20 |
+| fabric-orderer | 0 | 19 | 119 | 33 | 8 |
+| fabric-ca | 0 | 56 | 125 | 33 | 24 |
+| fabric-nodeenv | 0 | 4 | 8 | 1 | 0 |
+| kubo | 0 | 13 | 7 | 1 | 7 |
 
-IPFS returned no OS package targets, so this pass does not establish its vulnerability status. Its compiled Go dependency scan remains required. The broader full library scans also remain incomplete. The runner correctly returns `INCOMPLETE`, not a passing release result.
+The source dependency graph is clear. The actual API, Keycloak and PostgreSQL runtime images have no high, critical or unknown findings. Full scanning exposed old Go code in PostgreSQL/IPFS privilege-switching helpers; those unnecessary helpers were removed and both fresh-volume and existing-data startup were verified without root.
 
-The [priority Fabric OS fixes](RUNTIME_PATCHES.md) are applied and validated. Next: review PostgreSQL/Keycloak findings against vendor support and reachable features, and run full binary/library scans. A listed package fix does not justify an untested in-place change to a running blockchain network. Pin and validate replacement images through the existing integration/recovery tests before promotion. The previously documented Spring feature-applicability assessment remains in [Security scan](SECURITY_SCAN.md); this gate does not automatically waive those findings.
+Fabric 2.5.16 / CA 1.5.22, the Node runtime's bundled npm dependencies and IPFS still contain high/unknown findings. Upstream patch upgrades and OS fixes reduced the findings but did not eliminate them. No advisory is automatically waived as unreachable or unfixed. These remaining binaries/dependencies need reviewed vendor/toolchain remediation, compatibility testing and another complete scan before release. The locked chaincode application's clean npm audit does not cover npm bundled in the runtime image.
+
+The reports are retained locally at `.runtime/security/20261011T171219Z-b5d37765/`, with immutable image references in `summary.json`; they are intentionally not committed. Later builds or database updates require fresh scans. Host, infrastructure and external deployment coverage remain outside this local gate. See [Security scan](SECURITY_SCAN.md), [Runtime patches](RUNTIME_PATCHES.md) and [Identity migration](IDENTITY_MIGRATION.md).
 
 Five regression tests exercise critical/unfixed/unknown finding rejection, full clean/lower-severity results, partial coverage, missing/failed scans and invalid reports:
 
