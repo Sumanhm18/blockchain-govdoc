@@ -17,8 +17,10 @@ The initial API OS scan found 37 package findings: 1 high, 15 medium and 21 low.
 
 The pinned Keycloak 26.8.0 base OS scan reports 64 package findings: 6 high, 29 medium and 29 low. The high findings are CVE-2026-103111, CVE-2026-86145 and CVE-2026-89161, each reported against both `pcre2` and `pcre2-syntax` 10.40-6.el9. The scanner lists no fixed version. These remain unresolved and require vendor tracking and exposure review before public deployment.
 
-Container scans are OS-only. A full Keycloak Java scan was stopped during its large, slow Java-index download; its Java dependency coverage is incomplete. The API source scan covers the Maven graph, but does not replace a complete binary/image scan. Fabric, PostgreSQL, IPFS, the host and external infrastructure have not received comprehensive vulnerability assessment. No claim of a clean overall software supply chain is made.
+Container scans are OS-only. A full Keycloak Java scan was stopped during its large, slow Java-index download; its Java dependency coverage is incomplete. The API source scan covers the Maven graph, but does not replace a complete binary/image scan. A subsequent [runtime OS triage and automated gate](SECURITY_GATE.md) adds Fabric and PostgreSQL findings. IPFS returned no OS targets. Full binary/library, host and external-infrastructure coverage remains incomplete. No claim of a clean overall software supply chain is made.
 
 ## Reproduction
 
 Install and independently verify Trivy, then scan the source while excluding generated runtime/vendor/build directories. Scan the actual built API and the pinned Keycloak image with `trivy image --pkg-types os --scanners vuln`. Keep scanner databases current and save JSON results with image digests. Run the broader Java/image/infrastructure scans before a production release. npm audit of the locked chaincode graph reported no advisories at this validation point.
+
+Use the committed [security gate](SECURITY_GATE.md) for reproducible scans and the expanded runtime backlog.

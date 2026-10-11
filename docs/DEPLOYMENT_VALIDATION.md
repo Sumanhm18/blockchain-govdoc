@@ -39,6 +39,8 @@ Encrypted backups are retained in `.runtime/backups`. Their AES-256-GCM wrapping
 
 ## Monitoring and release gates
 
+The [automated security gate](SECURITY_GATE.md) blocks on high/critical/unknown findings and incomplete coverage. Its full scan still needs to finish; the local OS triage found additional runtime-image findings.
+
 Existing OPERATOR-only actuator metrics now include `registry.upload.pending`, `registry.upload.rejected` and `registry.upload.oldest.pending.seconds` (age since the oldest pending job's last update). Integrate these with the organization's monitoring system; alert on sustained backlog, rejected jobs, dependency readiness, capacity, certificate expiry and security failures. No notification destination has been configured.
 
 Before public deployment: complete external credential inventory/revocation and CA trust migration, review [residual security findings](SECURITY_SCAN.md) and advisory applicability, provision real identity/secret/backup infrastructure, implement resilient network/storage topology and prove recovery/failover under the chosen production policy. Billing-blocked GitHub CI must also run successfully. These are explicit external release gates, not claims that a local staging test fulfills them.

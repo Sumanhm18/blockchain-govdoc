@@ -1,0 +1,35 @@
+name: Security release gate
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Verify gate failure behavior
+        run: python3 scripts/test-security-gate.py
+      - name: Install checksum-verified scanner
+        run: python3 scripts/install-trivy.py
+      - name: Build and scan source and runtime images
+        run: ./scripts/security-scan.sh --build
+      - name: Summarize release status
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          reports = sorted(Path('.runtime/security').glob('*/summary.json'))
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as out:
+              if not reports:
+                  out.write('Security gate incomplete: no summary was produced.\n')
+              else:
+                  report = json.loads(reports[-1].read_text())
+                  out.write('Security gate: **' + report['status'] + '**\n\n')
+                  for scan in report['scans']:
+                      out.write('- ' + scan['target'] + ': ' + json.dumps(scan.get('counts', scan.get('error'))) + '\n')
+          PY
+      # Runtime logs and image metadata remain private; never upload .runtime wholesale.

@@ -21,6 +21,7 @@ jobs:
           java-version: '17'
           cache: maven
       - run: python3 scripts/check-secrets.py
+      - run: python3 scripts/test-security-gate.py
       - run: npm ci --prefix chaincode/docregistry
       - run: npm test --prefix chaincode/docregistry
       - run: npm audit --prefix chaincode/docregistry --audit-level=high
