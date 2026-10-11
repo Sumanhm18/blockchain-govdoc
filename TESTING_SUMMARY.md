@@ -16,6 +16,7 @@ Validated locally on 11 October 2026 using macOS arm64, Docker Desktop, a fresh 
 | Real HTTPS/OIDC staging | 37 checks pass against Keycloak, including token signature/discovery, citizen isolation, ownership retry conflicts and revocation; 20 concurrent-read smoke requests have zero failures |
 | Encrypted restore | Pass: encrypted snapshot, tamper rejection, checksums and exact download from an isolated restored API/IPFS instance |
 | Disposable certificate revocation | Pass: enrollment, CA revocation, signed channel MSP CRL update, revoked identity denial and existing service continuity |
+| Patched runtime deployment | All six Fabric services and both chaincode containers use the patched image contents; live registry checks pass |
 | Required endorser outage | Pass: writes fail safely during outage and recover without duplicate registration; this is not HA failover |
 | npm audit | No advisories reported for the locked chaincode dependency graph at validation time |
 | Source hygiene | Private-key/generated-artifact pattern check and `git diff --check` pass |

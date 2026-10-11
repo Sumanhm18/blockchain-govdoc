@@ -1,0 +1,4 @@
+{
+  "node": "node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402",
+  "fabric_nodeenv": "hyperledger/fabric-nodeenv:2.5@sha256:17e2d447ca0de5b4e3f6950a1c9b24ecfdeecdd90e111e11d771970d35159bf1"
+}

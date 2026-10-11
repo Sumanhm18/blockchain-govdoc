@@ -62,6 +62,8 @@ def main():
     pins = json.loads((ROOT / 'config/images.json').read_text())
     if args.build:
         commands = [
+            ['bash', 'scripts/build-node-runtime.sh'],
+            ['python3', 'scripts/build-fabric-images.py'],
             ['docker', 'build', '-t', 'govdoc-staging-api', 'application/api-spring'],
             ['docker', 'build', '-t', 'govdoc-staging-keycloak', '--build-arg',
              'KEYCLOAK_IMAGE=' + staging['keycloak'], '-f', 'deploy/keycloak.Dockerfile', 'deploy'],
@@ -76,7 +78,18 @@ def main():
                if name.startswith(('hyperledger/fabric-peer:', 'hyperledger/fabric-orderer:',
                                    'hyperledger/fabric-ca:', 'hyperledger/fabric-nodeenv:', 'ipfs/'))]
     for label, image in images:
-        if label in {'api', 'keycloak'}:
+        if label in {'fabric-peer', 'fabric-orderer', 'fabric-ca'}:
+            try:
+                patched = json.loads((ROOT / '.runtime/fabric-images.json').read_text())
+                image = next(value['reference'] for key, value in patched.items() if key.startswith('hyperledger/' + label + ':'))
+            except (OSError, ValueError, KeyError, StopIteration):
+                image = ''
+        if label == 'fabric-nodeenv':
+            try:
+                image = json.loads((ROOT / '.runtime/node-runtime.json').read_text())['reference']
+            except (OSError, ValueError, KeyError):
+                image = ''
+        if label in {'api', 'keycloak', 'fabric-nodeenv', 'fabric-peer', 'fabric-orderer', 'fabric-ca'}:
             # Resolve mutable local build tags once, then scan their immutable content IDs.
             try:
                 image = subprocess.check_output(['docker', 'image', 'inspect', '--format', '{{.Id}}', image],

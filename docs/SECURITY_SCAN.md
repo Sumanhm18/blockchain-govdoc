@@ -24,3 +24,5 @@ Container scans are OS-only. A full Keycloak Java scan was stopped during its la
 Install and independently verify Trivy, then scan the source while excluding generated runtime/vendor/build directories. Scan the actual built API and the pinned Keycloak image with `trivy image --pkg-types os --scanners vuln`. Keep scanner databases current and save JSON results with image digests. Run the broader Java/image/infrastructure scans before a production release. npm audit of the locked chaincode graph reported no advisories at this validation point.
 
 Use the committed [security gate](SECURITY_GATE.md) for reproducible scans and the expanded runtime backlog.
+
+The priority Fabric Node/peer/orderer/CA OS fixes are now applied; see [Runtime patches](RUNTIME_PATCHES.md) for before/after evidence and validation.

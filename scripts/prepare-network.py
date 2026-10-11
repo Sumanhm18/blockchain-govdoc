@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Materialize the pinned upstream sample in ignored runtime storage."""
-import hashlib, json, os, platform, re, secrets, shutil, tarfile, urllib.request
+import hashlib, json, os, platform, re, secrets, shutil, subprocess, tarfile, urllib.request
 from pathlib import Path
 os.umask(0o077)
 root = Path(__file__).resolve().parents[1]
@@ -70,4 +70,29 @@ if not network.exists():
         file.write_text(content)
     (root / '.runtime/secrets/ca-bootstrap.json').write_text(json.dumps(substitutions))
     print('Prepared private development network from the pinned Fabric samples revision.')
-print('Fabric binaries and network configuration are ready.')
+# Refresh the chaincode runtime on existing networks without regenerating identities/data.
+manifest = json.loads((root / '.runtime/node-runtime.json').read_text())
+actual = subprocess.check_output(['docker', 'image', 'inspect', '--format', '{{.Id}}', manifest['reference']], text=True).strip()
+if actual != manifest['image_id']:
+    raise SystemExit('Patched chaincode runtime does not match its recorded image ID')
+compose = network / 'compose/compose-test-net.yaml'
+content, replacements = re.subn(r'CORE_CHAINCODE_NODE_RUNTIME=[^\s]+', 'CORE_CHAINCODE_NODE_RUNTIME=' + manifest['reference'], compose.read_text())
+if replacements != 2:
+    raise SystemExit('Expected exactly two managed peer runtime settings')
+compose.write_text(content)
+print('Fabric binaries and patched chaincode runtime configuration are ready.')
+
+# Only image fields in our generated Compose files are replaced; CA secrets/MSPs stay intact.
+patched = json.loads((root / '.runtime/fabric-images.json').read_text())
+for original, image in patched.items():
+    actual = subprocess.check_output(['docker', 'image', 'inspect', '--format', '{{.Id}}', image['reference']], text=True).strip()
+    if actual != image['image_id']:
+        raise SystemExit('Patched Fabric image does not match its recorded image ID')
+    component = original.split('/')[1].split(':')[0]
+    pattern = r'(?m)^(\s*image:\s*)(?:hyperledger/' + re.escape(component) + r':[^\s]+|govdoc-' + re.escape(component) + r':[^\s]+)'
+    for compose_file in (network / 'compose').rglob('*.yaml'):
+        before = compose_file.read_text()
+        after = re.sub(pattern, lambda match: match.group(1) + image['reference'], before)
+        if after != before:
+            compose_file.write_text(after)
+print('Pinned OS-patched peer, orderer and CA images configured.')
