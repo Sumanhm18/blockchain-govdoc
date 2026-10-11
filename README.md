@@ -4,6 +4,10 @@ A development implementation of document registration, encrypted storage, verifi
 
 This repository is a prototype, not a certified government service. Its Fabric sample network has two organizations, one peer per organization and one Raft orderer. It is not highly available. Blockchain preserves submitted records; it cannot establish whether their original contents are true.
 
+## Submission and presentation
+
+Start with the [October 14 submission guide](docs/SUBMISSION.md) and [project report draft](docs/PROJECT_REPORT.md). On a prepared computer, run `python3 scripts/resume-demo.py`, then `./demo.sh --pause` for a live six-step walkthrough. The restart command reuses existing containers without downloads or rebuilds.
+
 ## Quick start
 
 Requirements: macOS or Linux, Docker with Compose, Git, Python 3.12+, and internet access. Node 20+ and Java 17+/Maven are needed only for host-side tests/development. Start Docker first. Run from this directory:

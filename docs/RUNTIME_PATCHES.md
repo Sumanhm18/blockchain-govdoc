@@ -1,6 +1,6 @@
 # Priority runtime remediation — 11 October 2026
 
-The Fabric Node runtime was rebuilt on digest-pinned Node 22.23.3 / Alpine 3.24.2. It retains `build.sh` and `start.sh` from the pinned Fabric 2.5.8-compatible upstream image, together with the compiler/Python tools needed to install chaincode. npm is pinned to 12.2.0. Its source base pins are in `config/node-runtime.json`.
+The Fabric Node runtime was rebuilt on digest-pinned Node 22.23.3 / Alpine 3.24.2. It retains `build.sh` and `start.sh` from the pinned Fabric 2.5.8-compatible upstream image, together with the compiler/Python tools needed to install chaincode. npm is pinned to 12.2.0 with a separately locked, patched dependency graph; the full runtime scan now reports only two medium findings. See `deploy/npm-runtime/README.md`. Its source base pins are in `config/node-runtime.json`.
 
 The peer/orderer and build environment now use Fabric 2.5.16; the CA uses 1.5.22. Derived images also install the Jammy security fixes `libssl3=3.0.2-0ubuntu1.30` and `gpgv=2.2.27-3ubuntu2.5`. The local network was upgraded after an encrypted cold snapshot, retaining its identities, ledgers and volumes. `scripts/backup-fabric-runtime.py` creates that restricted snapshot and restarts the services it stopped; creating the snapshot is not a Fabric ledger restore drill.
 

@@ -19,9 +19,11 @@ Validated locally on 11 October 2026 using macOS arm64, Docker Desktop, a fresh 
 | Patched runtime deployment | Fabric 2.5.16 / CA 1.5.22; all six services and both chaincode containers use the patched image contents. IPFS runs as UID 1000; live checks pass |
 | Identity migration | Encrypted logical PostgreSQL 17 migration preserves identity/client/credential fingerprints; old volume retained; 37 OIDC checks pass after non-root PostgreSQL/Keycloak changes |
 | Fresh data volumes | IPFS initializes as UID 1000 and PostgreSQL as UID 70 without the old gosu helpers |
-| Full security gate | All nine targets scanned; no critical findings. Source/API/Keycloak/PostgreSQL have no high/unknown findings. Fabric/Node/IPFS residual findings correctly block release |
+| Full security gate | All nine targets scanned; no critical findings. Source/API/Keycloak/PostgreSQL/Node runtime have no high/unknown findings. Fabric/IPFS residual findings correctly block release |
 | Main branch protection | Three required checks, strict branch updates and administrator enforcement enabled; force pushes/deletions disabled |
 | Required endorser outage | Pass: writes fail safely during outage and recover without duplicate registration; this is not HA failover |
+| Prepared demo restart | All eight owned services stopped and resumed without builds, pulls, key regeneration or data reset; 14-check walkthrough passes afterward |
+| Presentation walkthrough | 14 checks pass; included in integration CI: role denial, actual-file digest, IPFS ciphertext, exact download, original/tampered verification, revocation and retained history |
 | npm audit | No advisories reported for the locked chaincode dependency graph at validation time |
 | Source hygiene | Private-key/generated-artifact pattern check and `git diff --check` pass |
 

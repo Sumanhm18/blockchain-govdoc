@@ -20,3 +20,7 @@ A restricted, ignored local rollback bundle was retained at `.runtime/history-be
 Inventory every environment that used the old Fabric identities or CA roots. Replace affected identities/trust roots and publish CRLs through that network's governance. The successful disposable-identity revocation drill applies only to the fresh local sample network; no unknown external deployment was revoked.
 
 GitHub cached commits, pull-request refs, forks and third-party copies are outside this branch rewrite. An administrator must request hosting-provider sensitive-data removal and coordinate fork cleanup. No support request was sent. Suggested request scope: repository `Sumanhm18/blockchain-govdoc`, exposed Fabric key/wallet/generated identity and uploaded-document history, rewritten branch refs above, and retained PR/cached commit references. Provide the provider's requested incident details privately; never attach credentials to a public issue.
+
+## Submission review — October 11, 2026
+
+A read-only repository API check reported zero GitHub-visible forks. This does not establish that no independent clones, deleted forks, provider caches or old PR objects exist. External credential inventory/revocation and provider-side cleanup remain open; no support request was sent automatically.

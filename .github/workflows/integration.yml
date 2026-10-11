@@ -20,6 +20,8 @@ jobs:
         run: ./deploy.sh
       - name: Synthetic API, Fabric and IPFS scenario
         run: ./test_demo.sh
+      - name: Submission presentation walkthrough
+        run: ./demo.sh
       - name: Durable recovery across IPFS outage and API restart
         run: python3 scripts/test-recovery.py
       - name: Quorum and certificate revocation recovery
