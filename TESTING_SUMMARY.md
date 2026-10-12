@@ -24,7 +24,7 @@ Validated locally on 11–12 October 2026 using macOS arm64, Docker Desktop, a f
 | Main branch protection | Three required checks, strict branch updates and administrator enforcement enabled; force pushes/deletions disabled |
 | Required endorser outage | Pass: writes fail safely during outage and recover without duplicate registration; this is not HA failover |
 | Prepared demo restart | All eight owned services stopped and resumed without builds, pulls, key regeneration or data reset; 14-check walkthrough passes afterward |
-| Browser interface | Live issuance/download/verification/revocation/history, reader controls, missing-record handling, safe metadata rendering, reload/sign-out and mobile layout pass in Chromium; separate simulated responses cover pending and stale-result behavior |
+| Browser interface | Live issuance/download/verification/revocation/history, reader controls, missing-record handling, safe metadata rendering, reload/sign-out and mobile layout pass in Chromium; registration lookup after reload and the confirmed-record shortcut also pass; separate simulated responses cover automatic pending checks, expired sessions, request timeouts and stale-result behavior |
 | Presentation walkthrough | 14 checks pass; included in integration CI: role denial, actual-file digest, IPFS ciphertext, exact download, original/tampered verification, revocation and retained history |
 | npm audit | No advisories reported for the locked chaincode dependency graph at validation time |
 | Source hygiene | Private-key/generated-artifact pattern check and `git diff --check` pass |

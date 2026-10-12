@@ -3,6 +3,8 @@
   const $ = id => document.getElementById(id);
   let authorization = '', roles = [], currentId = '', generation = 0, recordVersion = 0;
   const active = new Set();
+  let trackingVersion = 0, trackingTimer, confirmedId = '';
+  function stopTracking() { trackingVersion++; clearTimeout(trackingTimer); $('tracking-note').textContent = ''; }
   const max = 10 * 1024 * 1024;
   function show(id, text, tone = '') {
     const el = $(id); el.textContent = text; el.className = `result ${tone}`; el.hidden = false;
@@ -10,9 +12,14 @@
   async function request(path, options = {}) {
     const ticket = generation;
     const controller = new AbortController(); active.add(controller);
+    const deadline = setTimeout(() => controller.abort(), 20000);
     try {
       const response = await fetch(path, { ...options, credentials: 'omit', cache: 'no-store', redirect: 'error', signal: controller.signal,
         headers: { ...options.headers, ...(authorization ? { Authorization: authorization } : {}) } });
+      if (response.status === 401 && !$('workspace').hidden && ticket === generation) {
+        signout(); show('notice', 'Your session has expired or is no longer accepted. Connect again to continue.', 'warning');
+        throw new DOMException('Authentication ended', 'AbortError');
+      }
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
         throw new Error(`${response.status}: ${error.message || 'Request could not be completed.'}`);
@@ -20,7 +27,12 @@
       const body = await response.arrayBuffer();
       if (ticket !== generation) throw new DOMException('Signed out', 'AbortError');
       return new Response(body, { status: response.status, headers: response.headers });
-    } finally { active.delete(controller); }
+    } catch (error) {
+      if (controller.signal.aborted && ticket === generation) {
+        throw new Error('Request timed out. For an upload, check registration status using the same document ID before retrying.');
+      }
+      throw error;
+    } finally { clearTimeout(deadline); active.delete(controller); }
   }
   function fileCheck(file) {
     if (!file || !file.size) throw new Error('Choose a nonempty file.');
@@ -28,12 +40,14 @@
   }
   function bind(id, action) {
     $(id).addEventListener('submit', async event => {
-      event.preventDefault(); const ticket = generation;
+      event.preventDefault();
+      if ($(id).getAttribute('aria-busy') === 'true') return;
+      $(id).setAttribute('aria-busy', 'true'); const ticket = generation;
       $('notice').hidden = true;
       const buttons = [...$(id).querySelectorAll('button')]; buttons.forEach(b => b.disabled = true);
       try { await action(); } catch (e) {
         if (ticket === generation && e.name !== 'AbortError') show('notice', e.message, 'error');
-      } finally { buttons.forEach(b => b.disabled = false); }
+      } finally { $(id).setAttribute('aria-busy', 'false'); buttons.forEach(b => b.disabled = false); }
     });
   }
   function clearRecord() {
@@ -42,10 +56,10 @@
     $('verify').reset(); $('revoke').reset();
   }
   function signout() {
-    generation++; active.forEach(c => c.abort()); authorization = ''; roles = []; clearRecord();
+    stopTracking(); confirmedId = ''; generation++; active.forEach(c => c.abort()); authorization = ''; roles = []; clearRecord();
     document.querySelectorAll('form').forEach(f => f.reset());
     $('workspace').hidden = true; $('connection').hidden = false; $('notice').hidden = true;
-    $('pending').hidden = true; $('upload-result').hidden = true; $('upload-result').textContent = '';
+    $('open-registered').hidden = true; $('upload-result').hidden = true; $('upload-result').textContent = '';
     $('roles').textContent = ''; modeChanged();
   }
   function modeChanged() {
@@ -105,22 +119,64 @@
     await request(`/api/documents/${encodeURIComponent(id)}/revoke`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: $('reason').value }) });
     if (currentId === id) await loadRecord(id); show('notice', 'Document revoked. Its history remains available.');
   });
-  async function registration(id) {
+  function confirmed(id) {
+    confirmedId = id;
+    show('upload-result', `CONFIRMED — ${id} is registered on the ledger.`);
+    $('open-registered').hidden = !roles.some(r => ['READER', 'CITIZEN'].includes(r));
+  }
+  async function registration(id, version, remaining = 15) {
     const state = await (await request(`/api/documents/${encodeURIComponent(id)}/registration`)).json();
-    const confirmed = state.state === 'CONFIRMED';
-    show('upload-result', confirmed ? `CONFIRMED — ${id} is registered on the ledger. Use Find & verify to retrieve it.` : `${state.state} — ${id}. ${state.state === 'REJECTED' ? 'Registration was rejected. Review the record before retrying.' : 'Ledger confirmation is pending. Check again before retrying this same ID.'}`, confirmed ? '' : 'warning');
-    $('pending').hidden = confirmed || state.state === 'REJECTED';
+    if (version !== trackingVersion) return;
+    if (!['STAGING', 'PINNED', 'SUBMITTING', 'CONFIRMED', 'REJECTED'].includes(state.state)) {
+      throw new Error('Unexpected registration status. Confirmation could not be established.');
+    }
+    if (state.state === 'CONFIRMED') { stopTracking(); confirmed(id); return; }
+    if (state.state === 'REJECTED') {
+      stopTracking(); show('upload-result', `REJECTED — ${id}. Review the record before retrying.`, 'error'); return;
+    }
+    show('upload-result', `${state.state} — ${id}. Ledger confirmation is pending.`, 'warning');
+    if (remaining <= 0) {
+      $('tracking-note').textContent = 'Automatic checks paused. You can check again. Keep this ID for any retry.';
+      return;
+    }
+    $('tracking-note').textContent = 'Checking every 2 seconds, with up to 15 follow-up checks. You may sign out safely.';
+    trackingTimer = setTimeout(async () => {
+      if (version !== trackingVersion) return;
+      try { await registration(id, version, remaining - 1); }
+      catch (error) {
+        if (version === trackingVersion) {
+          stopTracking(); show('notice', error.message, 'error');
+          $('tracking-note').textContent = 'Automatic checks stopped. Check again when the service is available.';
+        }
+      }
+    }, 2000);
   }
   bind('upload', async () => {
-    $('upload-result').hidden = true; $('pending').hidden = true;
+    stopTracking(); confirmedId = ''; $('open-registered').hidden = true; $('upload-result').hidden = true;
     const data = new FormData($('upload')); fileCheck(data.get('file'));
     if ($('owner-field').hidden) data.delete('ownerSubject');
-    const id = data.get('docId'); const response = await request('/api/documents/upload', { method: 'POST', body: data });
+    const id = data.get('docId'), version = trackingVersion;
     $('pending-id').value = id; $('lookup-id').value = id;
-    if (response.status === 202) { show('upload-result', `PENDING — ${id}. The upload is saved for recovery. Check registration status before retrying this same ID.`, 'warning'); $('pending').hidden = false; }
-    else { show('upload-result', `CONFIRMED — ${id} is registered on the ledger. Use Find & verify to retrieve it.`); $('upload').reset(); }
+    const response = await request('/api/documents/upload', { method: 'POST', body: data });
+    if (version !== trackingVersion) return;
+    if (response.status === 202) {
+      show('upload-result', `PENDING — ${id}. The upload is saved for recovery.`, 'warning');
+      await registration(id, version);
+    } else { confirmed(id); $('upload').reset(); }
   });
-  bind('pending', () => registration($('pending-id').value));
+  bind('pending', async () => {
+    stopTracking(); confirmedId = ''; $('open-registered').hidden = true; $('upload-result').hidden = true;
+    await registration($('pending-id').value, trackingVersion);
+  });
+  $('pending-id').addEventListener('input', () => {
+    stopTracking(); confirmedId = ''; $('open-registered').hidden = true; $('upload-result').hidden = true;
+  });
+  $('open-registered').addEventListener('click', async () => {
+    if (!confirmedId) return;
+    const id = confirmedId, ticket = generation; selectPanel('lookup'); $('lookup-id').value = id;
+    try { await loadRecord(id); }
+    catch (error) { if (ticket === generation && error.name !== 'AbortError') show('notice', error.message, 'error'); }
+  });
   $('download').addEventListener('click', async () => {
     const ticket = generation; const id = currentId;
     try {
