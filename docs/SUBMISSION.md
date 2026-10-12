@@ -68,6 +68,6 @@ Never submit `.runtime/` wholesale, `.git/`, keys, CA/bootstrap logs, credential
 1. Remediate residual Fabric/IPFS findings and pass the complete release gate.
 2. Have the account owner resolve GitHub billing, then run all required CI checks.
 3. Inventory and revoke externally used historical credentials; coordinate old clone/cache cleanup.
-4. Provision real identity proofing, PKCE login, domain/TLS, managed secrets/KMS and monitored infrastructure.
+4. Provision real identity proofing, production domain/TLS and PKCE client settings, managed secrets/KMS and monitored infrastructure.
 5. Establish off-site backups and prove full Fabric ledger restoration and resilient failover.
 6. Review and merge the draft PR only after required gates pass.

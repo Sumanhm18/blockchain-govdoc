@@ -1,7 +1,18 @@
 # Blockchain-Based Government Document Registry and Verification System
 
+
 **Report draft for submission — October 14, 2026**
-**Author / institution / supervisor:** complete these fields before submission.
+
+**Student name:** [Student name]
+
+**USN:** 1DS23IC049
+
+**College:** Dayananda Sagar College of Engineering
+
+**Department:** CSE–IoT
+
+**Guide:** [Guide name]
+
 **Repository:** https://github.com/Sumanhm18/blockchain-govdoc
 
 ## Abstract
