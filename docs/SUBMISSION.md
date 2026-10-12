@@ -13,6 +13,10 @@ This is a working local prototype of a permissioned government-document registry
 
 Do not perform dependency upgrades, delete the working checkout, or reset identities on the presentation day. Keep an independently controlled backup of local runtime data and keys. Source control alone does not preserve encrypted documents or their decryption keys.
 
+## Browser demonstration
+
+The submission now includes a [web interface](WEB_INTERFACE.md) at http://127.0.0.1:18081/. Use it for manual issuance, download, verification, revocation and history. Keep the CLI walkthrough below as a reproducible backup.
+
 ## Six-minute walkthrough
 
 | Time | Demonstrate | Explain |

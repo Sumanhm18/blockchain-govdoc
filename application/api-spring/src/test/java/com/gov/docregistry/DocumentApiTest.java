@@ -81,6 +81,20 @@ class DocumentApiTest {
   }
 
   @Test
+  void publicInterfaceDoesNotExposeAuthenticatedSession() throws Exception {
+    mvc.perform(get("/index.html"))
+        .andExpect(status().isOk())
+        .andExpect(header().string("Content-Security-Policy", org.hamcrest.Matchers.containsString("frame-ancestors 'none'")))
+        .andExpect(content().string(org.hamcrest.Matchers.containsString("Access the registry")));
+    mvc.perform(get("/registry.js")).andExpect(status().isOk());
+    mvc.perform(get("/api/session")).andExpect(status().isUnauthorized());
+    mvc.perform(get("/api/session").with(httpBasic("test-reader", "test-only-passphrase")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.roles[0]").value("READER"))
+        .andExpect(jsonPath("$.password").doesNotExist());
+  }
+
+  @Test
   void anonymousDocumentAccessIsDenied() throws Exception {
     mvc.perform(get("/api/documents/DOC-001")).andExpect(status().isUnauthorized());
     mvc.perform(

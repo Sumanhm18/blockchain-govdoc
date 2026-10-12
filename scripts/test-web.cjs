@@ -1,0 +1,81 @@
+/* Browser integration test. Requires Playwright + Chromium and a prepared local stack.
+ * Credentials remain in memory. Never enable traces or authentication screenshots.
+ */
+const { chromium } = require('playwright');
+const fs = require('node:fs/promises');
+const path = require('node:path');
+const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
+const root = path.resolve(__dirname, '..');
+(async () => {
+  const credentials = JSON.parse(await fs.readFile(path.join(root, '.runtime/secrets/credentials.json')));
+  const browser = await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ? {executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE} : {})});
+  let stage = 'startup';
+  try {
+    const context = await browser.newContext({viewport:{width:1280,height:900},acceptDownloads:true});
+    const page = await context.newPage();
+    const errors=[]; page.on('pageerror',e=>errors.push(e.name));
+    const base='http://127.0.0.1:18081';
+    const waitText=async(id,text)=>page.locator(id).filter({hasText:text}).waitFor({state:'visible',timeout:45000});
+    const login=async(user)=>{
+      await page.locator('#username').fill(user); await page.locator('#password').fill(credentials[user]);
+      await page.locator('#login button').click(); await page.locator('#workspace').waitFor({state:'visible'});
+      assert.equal(await page.locator('#password').inputValue(),'');
+    };
+    await page.goto(base); await waitText('#health','Service ready');
+    assert.equal((await context.request.get(base+'/api/session')).status(),401);
+    stage='issuer login'; await login('issuer');
+    assert.equal(await page.evaluate(()=>localStorage.length+sessionStorage.length),0);
+    const id='WEB-'+crypto.randomBytes(6).toString('hex').toUpperCase();
+    const file={name:'synthetic.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-1.4\nSynthetic web integration fixture\n%%EOF\n')};
+    stage='upload'; await page.locator('#issue-tab').click();
+    await page.locator('[name=docId]').fill(id); await page.locator('[name=subject]').fill('<img src=x onerror=alert(1)>');
+    await page.locator('[name=file]').setInputFiles(file); await page.locator('#upload button').click();
+    await waitText('#upload-result',id);
+    for(let i=0;i<30 && (await page.locator('#pending').isVisible());i++){
+      await page.waitForTimeout(1000); await page.locator('#pending button').click();
+      await page.waitForTimeout(300);
+    }
+    await waitText('#upload-result','CONFIRMED');
+    await page.locator('[data-panel=lookup]').click(); await page.locator('#lookup-id').fill(id);
+    await page.locator('#find button').click(); await waitText('#record-id',id);
+    assert.equal(await page.locator('#record-details img').count(),0);
+    stage='download'; const downloadEvent=page.waitForEvent('download'); await page.locator('#download').click();
+    const downloaded=await downloadEvent; assert.deepEqual(await fs.readFile(await downloaded.path()),file.buffer);
+    stage='valid verification'; await page.locator('#verify-file').setInputFiles(file); await page.locator('#verify button').click(); await waitText('#verification','VALID —');
+    stage='tampered verification'; await page.locator('#verify-file').setInputFiles({...file,buffer:Buffer.concat([file.buffer,Buffer.from('modified')])});
+    await page.locator('#verify button').click(); await waitText('#verification','TAMPERED_OR_MISMATCH');
+    stage='revoke'; await page.locator('#reason').fill('Synthetic browser test completed'); await page.locator('#confirm-revoke').check(); await page.locator('#revoke button').click();
+    await waitText('#record-state','REVOKED'); assert.equal(await page.locator('#download').isDisabled(),true);
+    await page.locator('#verify-file').setInputFiles(file); await page.locator('#verify button').click(); await waitText('#verification','REVOKED');
+    await page.locator('#history').click(); await waitText('#history-result',id);
+    stage='signout and reader'; await page.locator('#logout').click(); assert.equal(await page.locator('#record').isVisible(),false);
+    await login('reader'); assert.equal(await page.locator('#issue-tab').isVisible(),false);
+    await page.locator('#lookup-id').fill(id); await page.locator('#find button').click(); await waitText('#record-id',id);
+    assert.equal(await page.locator('#revoke-section').isVisible(),false);
+    stage='stale verification UI simulation';
+    let release, intercepted;
+    const delayed = new Promise(resolve=>release=resolve), seen = new Promise(resolve=>intercepted=resolve);
+    await page.route('**/verify-file',async route=>{intercepted();await delayed;await route.fulfill({status:200,contentType:'application/json',body:'{"status":"VALID"}'});});
+    await page.locator('#verify-file').setInputFiles(file); await page.locator('#verify button').click(); await seen;
+    await page.locator('#lookup-id').fill('MISSING-'+crypto.randomBytes(5).toString('hex').toUpperCase()); await page.locator('#find button').click(); await waitText('#notice','404');
+    release(); await page.waitForTimeout(300); await page.unrouteAll();
+    assert.equal(await page.locator('#record').isVisible(),false);
+    assert.equal(await page.locator('#verification').isVisible(),false);
+    stage='reload clears credentials'; await page.reload(); await page.locator('#connection').waitFor({state:'visible'});
+    assert.equal(await page.locator('#workspace').isVisible(),false);
+    stage='pending UI simulation'; await login('issuer'); await page.locator('#issue-tab').click();
+    await page.route('**/api/documents/upload',r=>r.fulfill({status:202,contentType:'application/json',body:'{"status":"REGISTRATION_PENDING"}'}));
+    await page.route('**/api/documents/WEB-PENDING/registration',r=>r.fulfill({status:200,contentType:'application/json',body:'{"state":"CONFIRMED"}'}));
+    await page.locator('[name=docId]').fill('WEB-PENDING'); await page.locator('[name=file]').setInputFiles(file); await page.locator('#upload button').click(); await waitText('#upload-result','PENDING');
+    await page.locator('#pending button').click(); await waitText('#upload-result','CONFIRMED');
+    await page.unrouteAll(); await page.locator('#logout').click();
+    stage='mobile layout'; await page.setViewportSize({width:390,height:844}); await page.reload();
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+    assert.deepEqual(errors,[]);
+    console.log('PASS: live browser issuance, exact download, valid/tampered/revoked verification, history, reader permissions, missing records, safe text rendering, signout/reload and mobile layout.');
+    console.log('PASS: separate mocked HTTP 202/status and stale verification UI scenarios. This scenario does not claim a live storage outage.');
+    await context.close();
+  } catch(error) { console.error('FAIL: browser scenario at '+stage+' ('+error.name+'). Credential values omitted.'); process.exitCode=1; }
+  finally { await browser.close(); }
+})().catch(e=>{console.error('Browser test setup failed ('+e.name+').');process.exitCode=1;});

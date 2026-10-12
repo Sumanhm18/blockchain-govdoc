@@ -45,10 +45,14 @@ public class SecurityConfig {
     http.csrf(c -> c.disable())
         .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .requestCache(c -> c.disable())
+        .headers(h -> h.contentSecurityPolicy(c -> c.policyDirectives(
+            "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; "
+                + "img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")))
         .cors(c -> c.configurationSource(cors(origins)))
         .authorizeHttpRequests(
             a ->
-                a.requestMatchers("/actuator/health", "/actuator/health/**")
+                a.requestMatchers("/", "/index.html", "/registry.css", "/registry.js",
+                        "/actuator/health", "/actuator/health/**")
                     .permitAll()
                     .requestMatchers("/actuator/**")
                     .hasRole("OPERATOR")
