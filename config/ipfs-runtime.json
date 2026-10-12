@@ -1,0 +1,9 @@
+{
+  "commit": "acc53c093810a8fe9a4bc2f023f0b1e0c1d629b5",
+  "source_sha256": "b744b98b00bcb775a19001b468e460a4f228d16033a3789382e5b07e09b76ae6",
+  "go_image": "golang:1.26.9-bookworm@sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c",
+  "modules": {
+    "golang.org/x/net": "v0.60.0",
+    "google.golang.org/grpc": "v1.83.2"
+  }
+}

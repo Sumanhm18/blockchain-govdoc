@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Encrypted application/IPFS backup and isolated restore drill; requires cryptography."""
-import hashlib, json, os, secrets, shutil, subprocess, tarfile, tempfile, time, urllib.request
+import argparse, hashlib, json, os, secrets, shutil, subprocess, tarfile, tempfile, time, urllib.request
 from pathlib import Path
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.exceptions import InvalidTag
@@ -48,7 +48,7 @@ def ready(port):
         time.sleep(1)
     raise RuntimeError('Restored API did not become ready')
 
-def main():
+def main(ipfs_image=None):
     id='BACKUP-'+secrets.token_hex(6).upper(); document=b'%PDF-1.4\nSynthetic backup restore fixture\n%%EOF\n'
     body,kind=e2e.multipart({'docId':id},document)
     e2e.call('POST','/api/documents/upload',200,body,content_type=kind)
@@ -57,6 +57,7 @@ def main():
     if any(c['Config']['Labels'].get('com.docker.compose.project')!='govdoc-dev-app' or not c['State']['Running'] for c in info): raise RuntimeError('Only a running isolated development stack can be backed up')
     ipfs=info[1];volume=next(m['Name'] for m in ipfs['Mounts'] if m['Destination']=='/data/ipfs')
     image=ipfs['Image']
+    restore_image=image if ipfs_image is None else json.loads(docker('image','inspect',ipfs_image).stdout)[0]['Id']
     staging=subprocess.run(['docker','inspect','govdoc-staging-api-1'],env=env,capture_output=True)
     if staging.returncode==0:
         current=json.loads(staging.stdout)[0]
@@ -92,7 +93,7 @@ def main():
             except InvalidTag:pass
             unseal(backup,archive,key);extract(archive,temp);archive.unlink()
             assert all(hashlib.sha256((snapshot/p).read_bytes()).hexdigest()==digest for p,digest in manifest.items())
-            docker('run','-d','--name',restore_container,'--label','govdoc.test=backup-restore','--user',f'{os.getuid()}:{os.getgid()}','-p','127.0.0.1:18002:5001','-v',str(snapshot/'ipfs')+':/data/ipfs',image,'daemon','--offline')
+            docker('run','-d','--name',restore_container,'--label','govdoc.test=backup-restore','--user',f'{os.getuid()}:{os.getgid()}','-p','127.0.0.1:18002:5001','-v',str(snapshot/'ipfs')+':/data/ipfs',restore_image,'daemon','--offline')
             restored_started=True
             restored_env=dict(os.environ,IPFS_API_BASE='http://127.0.0.1:18002',REGISTRY_DATABASE_URL='jdbc:h2:file:'+str(snapshot/'data/registry')+';DB_CLOSE_ON_EXIT=FALSE',REGISTRY_USERS_FILE=str(snapshot/'secrets/users.json'),REGISTRY_KEYS_FILE=str(snapshot/'secrets/encryption.json'))
             jar=temp/'app.jar';shutil.copyfile(root/'application/api-spring/target/api-spring-0.0.1-SNAPSHOT.jar',jar)
@@ -107,4 +108,7 @@ def main():
     ready(18081);e2e.call('POST','/api/documents/'+id+'/revoke',200,{'reason':'Synthetic backup drill complete'})
     print('PASS: encrypted consistent journal/key/IPFS backup, tamper rejection, restored file checksums and exact document download from an isolated restored API/IPFS.')
     print('Backup retained at '+str(backup.relative_to(root))+'. Wrapping key remains separately in .runtime/secrets/backup-master.key. Fabric ledger was not restored by this drill.')
-if __name__=='__main__':main()
+if __name__=='__main__':
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--ipfs-image', help='Locally built candidate used only by the isolated restored IPFS container')
+    main(parser.parse_args().ipfs_image)

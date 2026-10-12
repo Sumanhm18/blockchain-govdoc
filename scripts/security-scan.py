@@ -64,8 +64,7 @@ def main():
         commands = [
             ['bash', 'scripts/build-node-runtime.sh'],
             ['python3', 'scripts/build-fabric-images.py'],
-            ['docker', 'build', '-t', 'govdoc-ipfs:local', '--build-arg',
-             'IPFS_IMAGE=' + pins['ipfs/kubo:v0.43.1'], '-f', 'deploy/ipfs.Dockerfile', 'deploy'],
+            ['python3', 'scripts/build-ipfs-image.py'],
             ['docker', 'build', '-t', 'govdoc-postgres:local', '--build-arg',
              'POSTGRES_IMAGE=' + staging['postgres'], '-f', 'deploy/postgres.Dockerfile', 'deploy'],
             ['docker', 'build', '-t', 'govdoc-staging-api', 'application/api-spring'],

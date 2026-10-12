@@ -25,11 +25,11 @@ The `Security release gate` GitHub workflow runs on pull requests and manual dis
 
 ## Full local validation and backlog
 
-All nine scans completed on 11 October 2026, including OS packages and supported language libraries. The Java index was downloaded and checked against its OCI layer SHA-256. The release result is **BLOCKED_FINDINGS (exit 1)**, with no incomplete targets or critical findings. Counts are package findings, not distinct exploitable vulnerabilities.
+All nine scans completed on 12 October 2026, including OS packages and supported language libraries. The Java index was downloaded and checked against its OCI layer SHA-256. The release result is **BLOCKED_FINDINGS (exit 1)**, with no incomplete targets or critical findings. Counts are package findings, not distinct exploitable vulnerabilities.
 
 | Target | Critical | High | Medium | Low | Unknown |
 |---|---:|---:|---:|---:|---:|
-| source | 0 | 0 | 1 | 0 | 0 |
+| source | 0 | 0 | 1 | 0 | 1 |
 | api | 0 | 0 | 15 | 16 | 0 |
 | keycloak | 0 | 0 | 2 | 0 | 0 |
 | postgres | 0 | 0 | 1 | 0 | 0 |
@@ -37,13 +37,13 @@ All nine scans completed on 11 October 2026, including OS packages and supported
 | fabric-orderer | 0 | 19 | 119 | 33 | 8 |
 | fabric-ca | 0 | 56 | 125 | 33 | 24 |
 | fabric-nodeenv | 0 | 0 | 2 | 0 | 0 |
-| kubo | 0 | 13 | 7 | 1 | 7 |
+| kubo | 0 | 0 | 0 | 0 | 1 |
 
-The source dependency graph is clear. The actual API, Keycloak, PostgreSQL and Node runtime images have no high, critical or unknown findings. Full scanning exposed old Go code in PostgreSQL/IPFS privilege-switching helpers; those unnecessary helpers were removed and both fresh-volume and existing-data startup were verified without root.
+The source locks retain one medium finding and the unknown-severity Go advisory described below. The actual API, Keycloak, PostgreSQL and Node runtime images have no high, critical or unknown findings. Full scanning exposed old Go code in PostgreSQL/IPFS privilege-switching helpers; those unnecessary helpers were removed and both fresh-volume and existing-data startup were verified without root.
 
-Fabric 2.5.16 / CA 1.5.22 and IPFS still contain high/unknown findings. Upstream patch upgrades and OS fixes reduced the findings but did not eliminate them. No advisory is automatically waived as unreachable or unfixed. These remaining binaries/dependencies need reviewed vendor/toolchain remediation, compatibility testing and another complete scan before release. The Node runtime now rebuilds npm 12.2.0 with a reviewed SHA-512-locked dependency graph (brace-expansion 5.0.11, http-cache-semantics 4.3.0 and undici 6.28.1). It reports two medium findings and no high/critical/unknown findings; both peers installed and ran the chaincode successfully. See `deploy/npm-runtime/README.md` for this maintained-build boundary.
+Fabric 2.5.16 / CA 1.5.22 still contain high/unknown findings. The rebuilt IPFS binary has no high findings, but retains GO-2026-5932 against golang.org/x/crypto with unknown severity and no listed fixed version; the source lock reports the same advisory. See [IPFS rebuild](IPFS_RUNTIME.md). Upstream patch upgrades and OS fixes reduced the findings but did not eliminate them. No advisory is automatically waived as unreachable or unfixed. These remaining binaries/dependencies need reviewed vendor/toolchain remediation, compatibility testing and another complete scan before release. The Node runtime now rebuilds npm 12.2.0 with a reviewed SHA-512-locked dependency graph (brace-expansion 5.0.11, http-cache-semantics 4.3.0 and undici 6.28.1). It reports two medium findings and no high/critical/unknown findings; both peers installed and ran the chaincode successfully. See `deploy/npm-runtime/README.md` for this maintained-build boundary.
 
-The reports are retained locally at `.runtime/security/20261011T173449Z-4255f259/`, with immutable image references in `summary.json`; they are intentionally not committed. Later builds or database updates require fresh scans. Host, infrastructure and external deployment coverage remain outside this local gate. See [Security scan](SECURITY_SCAN.md), [Runtime patches](RUNTIME_PATCHES.md) and [Identity migration](IDENTITY_MIGRATION.md).
+The reports are retained locally at `.runtime/security/20261012T050120Z-2d8e48ac/`, with immutable image references in `summary.json`; they are intentionally not committed. Later builds or database updates require fresh scans. Host, infrastructure and external deployment coverage remain outside this local gate. See [Security scan](SECURITY_SCAN.md), [Runtime patches](RUNTIME_PATCHES.md) and [Identity migration](IDENTITY_MIGRATION.md).
 
 Five regression tests exercise critical/unfixed/unknown finding rejection, full clean/lower-severity results, partial coverage, missing/failed scans and invalid reports:
 

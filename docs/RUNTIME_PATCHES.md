@@ -1,10 +1,10 @@
-# Priority runtime remediation — 11 October 2026
+# Priority runtime remediation — 12 October 2026
 
 The Fabric Node runtime was rebuilt on digest-pinned Node 22.23.3 / Alpine 3.24.2. It retains `build.sh` and `start.sh` from the pinned Fabric 2.5.8-compatible upstream image, together with the compiler/Python tools needed to install chaincode. npm is pinned to 12.2.0 with a separately locked, patched dependency graph; the full runtime scan now reports only two medium findings. See `deploy/npm-runtime/README.md`. Its source base pins are in `config/node-runtime.json`.
 
 The peer/orderer and build environment now use Fabric 2.5.16; the CA uses 1.5.22. Derived images also install the Jammy security fixes `libssl3=3.0.2-0ubuntu1.30` and `gpgv=2.2.27-3ubuntu2.5`. The local network was upgraded after an encrypted cold snapshot, retaining its identities, ledgers and volumes. `scripts/backup-fabric-runtime.py` creates that restricted snapshot and restarts the services it stopped; creating the snapshot is not a Fabric ledger restore drill.
 
-The IPFS image starts directly as UID 1000/GID 100 and removes the obsolete Go-built `/sbin/gosu` privilege-switching helper. Existing data remains in its original volume. A fresh isolated volume also passed non-root initialization. Full image scanning reported zero critical, 13 high, seven medium, one low and seven unknown findings after this change, versus three critical and 45 high before it.
+The IPFS image starts directly as UID 1000/GID 100 and removes the obsolete Go-built `/sbin/gosu` privilege-switching helper. Existing data remains in its original volume. A fresh isolated volume also passed non-root initialization. After helper removal, the earlier full scan reported zero critical and 13 high findings, versus three critical and 45 high before it. The subsequent [source-pinned IPFS rebuild](IPFS_RUNTIME.md) on October 12 removes those 13 high findings; one unknown-severity x/crypto advisory remains. The rebuilt image passed isolated encrypted restore and live checks before being retained on the existing volume.
 ## Earlier OS remediation baseline
 
 These are Trivy package findings, not counts of distinct exploitable vulnerabilities.

@@ -1,6 +1,6 @@
 # Validation record
 
-Validated locally on 11 October 2026 using macOS arm64, Docker Desktop, a fresh isolated Fabric development network, IPFS and synthetic documents only. No external government deployment was tested.
+Validated locally on 11–12 October 2026 using macOS arm64, Docker Desktop, a fresh isolated Fabric development network, IPFS and synthetic documents only. No external government deployment was tested.
 
 ## Automated suites
 
@@ -18,8 +18,9 @@ Validated locally on 11 October 2026 using macOS arm64, Docker Desktop, a fresh 
 | Disposable certificate revocation | Pass: enrollment, CA revocation, signed channel MSP CRL update, revoked identity denial and existing service continuity |
 | Patched runtime deployment | Fabric 2.5.16 / CA 1.5.22; all six services and both chaincode containers use the patched image contents. IPFS runs as UID 1000; live checks pass |
 | Identity migration | Encrypted logical PostgreSQL 17 migration preserves identity/client/credential fingerprints; old volume retained; 37 OIDC checks pass after non-root PostgreSQL/Keycloak changes |
+| IPFS source rebuild | Go 1.26.9 build, locked module checksums and upstream repo/fsrepo + core/coreunix tests pass; isolated encrypted restore, 16 live API + 2 Fabric + 14 walkthrough + 37 OIDC checks and outage/restart recovery pass with the deployed image |
 | Fresh data volumes | IPFS initializes as UID 1000 and PostgreSQL as UID 70 without the old gosu helpers |
-| Full security gate | All nine targets scanned; no critical findings. Source/API/Keycloak/PostgreSQL/Node runtime have no high/unknown findings. Fabric/IPFS residual findings correctly block release |
+| Full security gate | All nine targets scanned; no critical findings. API/Keycloak/PostgreSQL/Node runtime have no high/unknown findings. Fabric high/unknown findings and the IPFS/source x/crypto unknown finding correctly block release |
 | Main branch protection | Three required checks, strict branch updates and administrator enforcement enabled; force pushes/deletions disabled |
 | Required endorser outage | Pass: writes fail safely during outage and recover without duplicate registration; this is not HA failover |
 | Prepared demo restart | All eight owned services stopped and resumed without builds, pulls, key regeneration or data reset; 14-check walkthrough passes afterward |

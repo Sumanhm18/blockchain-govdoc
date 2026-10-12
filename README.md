@@ -17,7 +17,7 @@ Requirements: macOS or Linux, Docker with Compose, Git, Python 3.12+, and intern
 ./test_demo.sh
 ```
 
-`deploy.sh` initializes the pinned Fabric samples submodule, downloads versioned Fabric tools, generates fresh development credentials and encryption keys, creates an isolated network, deploys the contract, enrolls an attributed issuer identity, and builds the API container with tests. First deployment takes several minutes. Private runtime files and detailed logs remain in ignored `.runtime/`; do not publish that directory. Development account passwords are available locally in `.runtime/secrets/credentials.json`, never in source or command examples.
+`deploy.sh` initializes the pinned Fabric samples submodule, downloads versioned Fabric tools, generates fresh development credentials and encryption keys, creates an isolated network, deploys the contract, enrolls an attributed issuer identity, and builds the API container with tests. First deployment includes a pinned Go source build for IPFS and can take substantially longer on a cold cache. Prepare before presentation day; use `python3 scripts/resume-demo.py` for subsequent rehearsals. See [IPFS runtime](docs/IPFS_RUNTIME.md). Private runtime files and detailed logs remain in ignored `.runtime/`; do not publish that directory. Development account passwords are available locally in `.runtime/secrets/credentials.json`, never in source or command examples.
 
 API: `http://127.0.0.1:18081`. Readiness: `/actuator/health/readiness`. The IPFS administrative API is local-only at port 15001. Fabric host ports are 17050/17051/19051; CA ports are 17054/18054/19054. Existing standard Fabric sample containers are not used.
 
