@@ -114,6 +114,18 @@ class SignedJwtApiTest {
   }
 
   @Test
+  void sessionReturnsOnlyAuthenticatedCitizensOwnReference() throws Exception {
+    mvc.perform(get("/api/session").with(https()))
+        .andExpect(status().isUnauthorized());
+    mvc.perform(get("/api/session").with(https()).header("Authorization", "Bearer " + valid(List.of("CITIZEN"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.citizenReference").value("opaque-citizen-or-staff-id"));
+    mvc.perform(get("/api/session").with(https()).header("Authorization", "Bearer " + valid(List.of("READER"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.citizenReference").doesNotExist());
+  }
+
+  @Test
   void signedReaderTokenAuthenticatesAndCannotRevoke() throws Exception {
     when(ledger.get("DOC-001"))
         .thenReturn(

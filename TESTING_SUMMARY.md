@@ -6,7 +6,7 @@ Validated locally on 11–12 October 2026 using macOS arm64, Docker Desktop, a f
 
 | Check | Result / coverage |
 |---|---|
-| Java Maven suite | 44 tests pass on Spring Boot 4.1.1, Jackson 3.1.7 and Tomcat 11.0.26: signed JWT validation, citizen ownership and department isolation, protected metrics, HTTP authentication/roles/validation/errors, JWT claim validation, account/IP limits, structured IPFS responses/failures/limits, encryption and tampering, durable recovery, duplicate handling, revoked download and Gateway dependency compatibility |
+| Java Maven suite | 45 tests pass on Spring Boot 4.1.1, Jackson 3.1.7 and Tomcat 11.0.26: signed JWT validation, authenticated citizen assignment references, citizen ownership and department isolation, protected metrics, HTTP authentication/roles/validation/errors, JWT claim validation, account/IP limits, structured IPFS responses/failures/limits, encryption and tampering, durable recovery, duplicate handling, revoked download and Gateway dependency compatibility |
 | Node contract suite | 17 tests pass: registration, issuer attributes, cross-department/MSP denial, duplicates, missing IDs, validation, matching/mismatching/revoked outcomes, deterministic metadata, post-2038 timestamps, history and Fabric dispatcher argument count |
 | Live API/IPFS/Fabric | 16 checks pass: authenticated upload, encrypted IPFS bytes, verified plaintext download, hash/file verification, revocation, duplicates, missing records and history |
 | Direct Fabric authorization | 2 checks pass: unattributed identity and department impersonation rejected without relying on HTTP security |
@@ -55,3 +55,5 @@ CI definitions run source and development integration checks on pull requests, w
 ## Not established by these tests
 
 Production readiness, live government identity integration, HSM/KMS integration, revocation on unidentified external deployments, highly available failover, multi-instance journal correctness, malicious-file detection, production load targets, legal compliance, vulnerability absence, penetration testing and full disaster recovery are not established. Read [Security scan](docs/SECURITY_SCAN.md) for residual Maven/container findings and coverage limits. History checks search limited private-key patterns; they cannot prove all sensitive data has been removed. Read [Security](docs/SECURITY.md) and [Operations](docs/OPERATIONS.md).
+
+Citizen assignment is exercised through the real browser flow: citizen retrieves their own reference, issuer uploads a file for that reference, citizen downloads the exact original and verifies it, and another citizen is denied. Session API tests ensure anonymous callers cannot retrieve a reference and staff sessions do not include one.

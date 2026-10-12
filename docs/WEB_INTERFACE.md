@@ -17,7 +17,7 @@ Citizens use the Keycloak sign-in button in HTTPS staging. See the PKCE setup be
 
 ## Credential and data handling
 
-Passwords and access tokens stay in page memory. The redirect flow temporarily stores callback state and an optional record ID as described below. Sign-out, reload and page exit clear the page's authentication state. Requests omit ambient browser credentials and send the explicit Authorization header only to the same-origin API. The server describes granted roles at authenticated `GET /api/session`; it returns no tokens, passwords or identity claims.
+Passwords and access tokens stay in page memory. The redirect flow temporarily stores callback state and an optional record ID as described below. Sign-out, reload and page exit clear the page's authentication state. Requests omit ambient browser credentials and send the explicit Authorization header only to the same-origin API. The server describes granted roles at authenticated `GET /api/session`; it returns no tokens or passwords. Authenticated JWT citizens also receive their own subject identifier as `citizenReference`; staff do not receive this field.
 
 A rejected/expired authenticated session clears the workspace and asks you to connect again. Requests time out after 20 seconds. For an interrupted upload, check the same ID before retrying because the server may still complete it. Automatic registration checks stop on sign-out, a changed tracking ID, errors or a terminal state.
 
@@ -58,3 +58,11 @@ Open an authorized document and choose **Verification link & QR**. Copy its link
 Localhost QR links work only on the computer serving the app. Cross-device scanning requires an accessible deployment with trusted HTTPS; this change does not publish the local registry to the internet.
 
 `node scripts/test-browser-oidc.cjs` validates real PKCE sign-in, callback cleanup, owned search, another citizen's denial when following a record link, and provider logout against local staging. It uses only the generated fixture public-key pins for browser TLS. `scripts/test-web.cjs` additionally decodes the rendered QR pixels with an independent decoder and checks the exact expected link.
+
+### Issue a document to a citizen
+
+1. In the HTTPS citizen browser, sign in as a citizen and copy **Your citizen reference**.
+2. Sign out, then sign in as an issuer. Open **Issue a document**, paste that reference into **Citizen reference**, select the file and register it.
+3. Sign out and return as the citizen. Find the document in **Documents**, download it and verify the file. Another citizen cannot read this record.
+
+The reference is an account identifier, not a password or independent proof of identity. It is displayed only for the currently authenticated citizen and cleared on sign-out. Leaving the assignment blank grants department access only. Development Basic accounts do not support citizen assignment; use the prepared HTTPS identity-provider flow.

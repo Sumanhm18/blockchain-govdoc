@@ -67,7 +67,7 @@
     document.querySelectorAll('form').forEach(f => f.reset());
     $('workspace').hidden = true; $('connection').hidden = false; $('notice').hidden = true;
     $('open-registered').hidden = true; $('upload-result').hidden = true; $('upload-result').textContent = '';
-    $('roles').textContent = ''; modeChanged();
+    $('roles').textContent = ''; $('citizen-reference').value = ''; $('citizen-account').hidden = true; modeChanged();
   }
   function modeChanged() {
     const basic = $('auth-mode').value === 'basic';
@@ -75,6 +75,11 @@
     $('username').required = basic; $('password').required = basic; $('token').required = !basic;
     $('password').value = ''; $('token').value = '';
   }
+  $('copy-citizen-reference').addEventListener('click', async () => {
+    const ticket = generation;
+    try { await navigator.clipboard.writeText($('citizen-reference').value); if (ticket === generation) show('notice', 'Citizen reference copied.'); }
+    catch { if (ticket === generation) show('notice', 'Select and copy the citizen reference above.'); }
+  });
   $('auth-mode').addEventListener('change', modeChanged); $('logout').addEventListener('click', () => { const remote = identitySession; signout(remote); if (remote) window.dispatchEvent(new Event('registry-identity-logout')); });
   window.addEventListener('pagehide', () => signout());
   bind('login', async () => {
@@ -91,6 +96,8 @@
   async function connected(bearer) {
     const session = await (await request('/api/session')).json(); roles = session.roles;
     $('roles').textContent = `Access: ${roles.join(', ')}`;
+    $('citizen-reference').value = session.citizenReference || '';
+    $('citizen-account').hidden = !session.citizenReference;
     $('connection').hidden = true; $('workspace').hidden = false;
     const reader = roles.some(r => ['READER', 'CITIZEN'].includes(r));
     $('issue-tab').hidden = !roles.includes('ISSUER'); $('owner-field').hidden = !bearer;
