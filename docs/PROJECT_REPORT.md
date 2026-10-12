@@ -80,8 +80,8 @@ Measured locally on macOS arm64 with Docker and synthetic data; see `TESTING_SUM
 
 | Check | Observed result |
 |---|---|
-| Java tests | 42 pass |
-| Chaincode tests | 15 pass |
+| Java tests | 44 pass |
+| Chaincode tests | 17 pass |
 | Live API/Fabric/IPFS integration | 16 checks pass |
 | Direct Fabric authorization | 2 checks pass |
 | HTTPS/OIDC ownership and roles | 37 checks pass, including 20 read-smoke requests |
@@ -95,7 +95,7 @@ Tests demonstrate the checked behaviors and failure cases. They do not establish
 
 ## 7. Limitations and future work
 
-Resolve remaining dependency findings, rotate externally exposed historical credentials where applicable and complete old clone/cache cleanup. Provision real citizen proofing and account recovery, authorization-code/PKCE login, managed keys, monitored infrastructure and separately controlled off-site backups. Add resilient storage and ordering/peer topology, prove complete ledger disaster recovery and test production workload targets. Multi-instance API operation requires a shared journal with tested coordination. QR verification, DID/verifiable credentials and selective disclosure remain future enhancements. The submitted browser interface supports the implemented document lifecycle with role-aware controls and memory-only account/token entry; production citizen login remains future work.
+Resolve remaining dependency findings, rotate externally exposed historical credentials where applicable and complete old clone/cache cleanup. Provision real citizen proofing and account recovery, trusted production login domains, managed keys, monitored infrastructure and separately controlled off-site backups. Add resilient storage and ordering/peer topology, prove complete ledger disaster recovery and test production workload targets. Multi-instance API operation requires a shared journal with tested coordination. DID/verifiable credentials and selective disclosure remain future enhancements. The browser interface includes access-controlled paginated search, recently opened records, a history timeline and QR record links that require authentication. Local HTTPS staging supports authorization-code/PKCE citizen login through Keycloak. Real identity proofing and trusted production domains remain external deployment work.
 
 ## 8. Contribution
 

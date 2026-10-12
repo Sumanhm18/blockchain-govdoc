@@ -6,7 +6,7 @@ This repository is a prototype, not a certified government service. Its Fabric s
 
 ## Submission and presentation
 
-Open the [local web interface](http://127.0.0.1:18081/) on a prepared running stack. It supports issuance, lookup, download, file verification, revocation and history. See [web interface instructions](docs/WEB_INTERFACE.md).
+Open the [local web interface](http://127.0.0.1:18081/) on a prepared running stack. It supports a searchable document dashboard, issuance, download, file verification, revocation, a history timeline and authenticated QR links. HTTPS staging adds citizen sign-in through Keycloak with PKCE. See [web interface instructions](docs/WEB_INTERFACE.md).
 
 Start with the [October 14 submission guide](docs/SUBMISSION.md) and [project report draft](docs/PROJECT_REPORT.md). On a prepared computer, run `python3 scripts/resume-demo.py`, then `./demo.sh --pause` for a live six-step walkthrough. The restart command reuses existing containers without downloads or rebuilds.
 
@@ -58,4 +58,4 @@ CI runs these checks. A separately invoked integration workflow provisions the d
 
 Department readers can access records from their issuing department/MSP. Citizens with validated JWTs can retrieve, download and verify records assigned to their issuer/subject hash. Citizens cannot issue, revoke or access history. The API still uses one Fabric service identity per department; application logs identify individual actors by a stable hash. See the deployment validation document for identity proofing and production limits.
 
-QR codes, DID/VC, selective disclosure, zero-knowledge proofs, malware scanning, replicated IPFS, multi-orderer availability and performance benchmarking are not implemented. See the operations and security documents before adapting this development setup for real documents.
+DID/VC, selective disclosure, zero-knowledge proofs, malware scanning, replicated IPFS, multi-orderer availability and performance benchmarking are not implemented. See the operations and security documents before adapting this development setup for real documents.

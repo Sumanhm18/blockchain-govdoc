@@ -54,6 +54,7 @@ services:
       SERVER_SSL_CERTIFICATE_PRIVATE_KEY: /run/tls/api.key
       REGISTRY_JWT_ISSUER: https://identity.govdoc.local:18443/realms/govdoc-lab
       REGISTRY_JWT_AUDIENCE: govdoc-api
+      REGISTRY_BROWSER_CLIENT: govdoc-browser
       REGISTRY_KEYS_FILE: /run/secrets/encryption.json
       REGISTRY_DATABASE_URL: jdbc:h2:file:/app/data/registry;DB_CLOSE_ON_EXIT=FALSE
       FABRIC_PEER: peer0.org1.example.com:7051

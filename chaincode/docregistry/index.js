@@ -79,6 +79,28 @@ class DocumentContract extends Contract {
     await ctx.stub.putState(docId, Buffer.from(serialized));
     return serialized;
   }
+  async searchDocuments(ctx, prefix, status, owner, after) {
+    const caller = identity(ctx);
+    if (!/^[A-Z0-9-]{0,50}$/.test(prefix) || !['ALL', 'ACTIVE', 'REVOKED'].includes(status)
+        || (owner && !hashPattern.test(owner)) || !text(after, 512)) fail('VALIDATION', 'Invalid search');
+    if (after && prefix && !after.startsWith(prefix)) fail('VALIDATION', 'Cursor does not match prefix');
+    const iterator = await ctx.stub.getStateByRange(after ? after + '\u0000' : prefix, prefix ? prefix + '~' : '');
+    const items = []; let scanned = 0, last = '', more = false;
+    try {
+      while (scanned < 250 && items.length < 20) {
+        const next = await iterator.next();
+        if (!next.value) break;
+        scanned++; last = next.value.key;
+        const record = JSON.parse(next.value.value.toString('utf8'));
+        if (record.docType === 'document' && record.issuer === caller.department && record.issuerMspId === caller.msp
+            && (!owner || record.metadata?.ownerSubjectHash === owner)
+            && (status === 'ALL' || (record.revoked === true) === (status === 'REVOKED'))) items.push(record);
+        if (next.done) break;
+      }
+      if (scanned === 250 || items.length === 20) more = !!(await iterator.next()).value;
+    } finally { await iterator.close(); }
+    return JSON.stringify({ items, nextAfter: more ? last : '' });
+  }
   async getDocumentHistory(ctx, docId) {
     await this.getDocument(ctx, docId);
     const iterator = await ctx.stub.getHistoryForKey(docId);

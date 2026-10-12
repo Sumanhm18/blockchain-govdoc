@@ -6,8 +6,8 @@ Validated locally on 11–12 October 2026 using macOS arm64, Docker Desktop, a f
 
 | Check | Result / coverage |
 |---|---|
-| Java Maven suite | 42 tests pass on Spring Boot 4.1.1, Jackson 3.1.7 and Tomcat 11.0.26: signed JWT validation, citizen ownership and department isolation, protected metrics, HTTP authentication/roles/validation/errors, JWT claim validation, account/IP limits, structured IPFS responses/failures/limits, encryption and tampering, durable recovery, duplicate handling, revoked download and Gateway dependency compatibility |
-| Node contract suite | 15 tests pass: registration, issuer attributes, cross-department/MSP denial, duplicates, missing IDs, validation, matching/mismatching/revoked outcomes, deterministic metadata, post-2038 timestamps, history and Fabric dispatcher argument count |
+| Java Maven suite | 44 tests pass on Spring Boot 4.1.1, Jackson 3.1.7 and Tomcat 11.0.26: signed JWT validation, citizen ownership and department isolation, protected metrics, HTTP authentication/roles/validation/errors, JWT claim validation, account/IP limits, structured IPFS responses/failures/limits, encryption and tampering, durable recovery, duplicate handling, revoked download and Gateway dependency compatibility |
+| Node contract suite | 17 tests pass: registration, issuer attributes, cross-department/MSP denial, duplicates, missing IDs, validation, matching/mismatching/revoked outcomes, deterministic metadata, post-2038 timestamps, history and Fabric dispatcher argument count |
 | Live API/IPFS/Fabric | 16 checks pass: authenticated upload, encrypted IPFS bytes, verified plaintext download, hash/file verification, revocation, duplicates, missing records and history |
 | Direct Fabric authorization | 2 checks pass: unattributed identity and department impersonation rejected without relying on HTTP security |
 | Live outage/restart recovery | Pass: IPFS failure, durable staging, API restart, automatic recovery, exact download and no duplicate registration |
@@ -24,7 +24,8 @@ Validated locally on 11–12 October 2026 using macOS arm64, Docker Desktop, a f
 | Main branch protection | Three required checks, strict branch updates and administrator enforcement enabled; force pushes/deletions disabled |
 | Required endorser outage | Pass: writes fail safely during outage and recover without duplicate registration; this is not HA failover |
 | Prepared demo restart | All eight owned services stopped and resumed without builds, pulls, key regeneration or data reset; 14-check walkthrough passes afterward |
-| Browser interface | Live issuance/download/verification/revocation/history, reader controls, missing-record handling, safe metadata rendering, reload/sign-out and mobile layout pass in Chromium; registration lookup after reload and the confirmed-record shortcut also pass; separate simulated responses cover automatic pending checks, expired sessions, request timeouts and stale-result behavior |
+| Real browser identity flow | Keycloak authorization code + S256 PKCE, owned dashboard search, cross-citizen QR-link denial, callback cleanup and provider logout pass with fixture TLS public-key pins |
+| Browser interface | Live issuance/download/verification/revocation/history, reader controls, missing-record handling, safe metadata rendering, reload/sign-out and mobile layout, dashboard/status search, readable history and independently decoded QR pixels pass in Chromium; registration lookup after reload and the confirmed-record shortcut also pass; separate simulated responses cover automatic pending checks, expired sessions, request timeouts and stale-result behavior |
 | Presentation walkthrough | 14 checks pass; included in integration CI: role denial, actual-file digest, IPFS ciphertext, exact download, original/tampered verification, revocation and retained history |
 | npm audit | No advisories reported for the locked chaincode dependency graph at validation time |
 | Source hygiene | Private-key/generated-artifact pattern check and `git diff --check` pass |

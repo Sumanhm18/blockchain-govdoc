@@ -15,7 +15,7 @@ Do not perform dependency upgrades, delete the working checkout, or reset identi
 
 ## Browser demonstration
 
-The submission now includes a [web interface](WEB_INTERFACE.md) at http://127.0.0.1:18081/. Use it for manual issuance, download, verification, revocation and history. Keep the CLI walkthrough below as a reproducible backup.
+The submission now includes a [web interface](WEB_INTERFACE.md) at http://127.0.0.1:18081/. Use it for document search, manual issuance, download, verification, revocation, history and QR links. Run `python3 scripts/open-citizen-browser.py` for the prepared local HTTPS/Keycloak demonstration; see WEB_INTERFACE.md for the isolated browser trust setup. Keep the CLI walkthrough below as a reproducible backup.
 
 ## Six-minute walkthrough
 

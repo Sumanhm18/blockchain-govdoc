@@ -21,7 +21,9 @@ case "${1:-}" in
     if [[ "$POSTGRES_IMAGE" == govdoc-postgres:local ]]; then
       docker build -t govdoc-postgres:local --build-arg "POSTGRES_IMAGE=$POSTGRES_BASE_IMAGE" -f deploy/postgres.Dockerfile deploy
     fi
-    python3 scripts/setup-staging.py; docker compose -f deploy/staging.compose.yml up --build --force-recreate -d ;;
+    python3 scripts/setup-staging.py; docker compose -f deploy/staging.compose.yml up --build --force-recreate -d
+    python3 scripts/wait-staging.py
+    python3 scripts/configure-browser-login.py ;;
   stop) docker compose -f deploy/staging.compose.yml stop ;;
   *) echo 'Usage: scripts/staging.sh {up|stop}'; exit 1 ;;
 esac

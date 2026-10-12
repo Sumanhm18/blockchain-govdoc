@@ -4,6 +4,8 @@ Base URL in development: `http://127.0.0.1:18081`. Every `/api/**` request requi
 
 | Method and path | Role | Input / result |
 |---|---|---|
+| GET `/api/client-config` | Public | Nonsecret identity mode, issuer and public browser client ID |
+| GET `/api/documents` | READER or CITIZEN | Optional `prefix`, `status=ALL|ACTIVE|REVOKED`, encrypted `cursor`; accessible `items` and `nextCursor` |
 | GET `/api/session` | Any authenticated account | Granted role names only, used by the interface |
 | POST `/api/documents` | ISSUER | JSON metadata registration; no file storage |
 | POST `/api/documents/upload` | ISSUER | multipart `file`, `docId`; optional `issuer`, `subject`, `type`, `ownerSubject` |

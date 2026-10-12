@@ -1,7 +1,7 @@
 /* Browser integration test. Requires Playwright + Chromium and a prepared local stack.
  * Credentials remain in memory. Never enable traces or authentication screenshots.
  */
-const { chromium } = require('playwright');
+const { chromium } = require('../application/web-assets/node_modules/playwright');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const assert = require('node:assert/strict');
@@ -21,6 +21,7 @@ const root = path.resolve(__dirname, '..');
       await page.locator('#username').fill(user); await page.locator('#password').fill(credentials[user]);
       await page.locator('#login button').click(); await page.locator('#workspace').waitFor({state:'visible'});
       assert.equal(await page.locator('#password').inputValue(),'');
+      await page.locator('[data-panel=lookup]').click();
     };
     await page.goto(base); await waitText('#health','Service ready');
     assert.equal((await context.request.get(base+'/api/session')).status(),401);
@@ -35,6 +36,15 @@ const root = path.resolve(__dirname, '..');
     await waitText('#upload-result','CONFIRMED');
     await page.locator('#open-registered').click(); await waitText('#record-id',id);
     assert.equal(await page.locator('#record-details img').count(),0);
+    stage='dashboard search'; await page.locator('#dashboard-tab').click(); await page.locator('#search-prefix').fill(id);
+    await page.locator('#search button').click(); await waitText('#search-results',id);
+    assert.equal(await page.locator('#search-results .document-row').count(),1);
+    await page.locator('#search-results button').click(); await waitText('#record-id',id);
+    stage='verification QR'; await page.locator('#share').click();
+    assert.equal(await page.locator('#share-link').inputValue(),base+'/#document='+id);
+    const pixels=await page.locator('#share-qr').evaluate(c=>({width:c.width,height:c.height,data:Array.from(c.getContext('2d').getImageData(0,0,c.width,c.height).data)}));
+    const jsQR=require('../application/web-assets/node_modules/jsqr');
+    assert.equal(jsQR(new Uint8ClampedArray(pixels.data),pixels.width,pixels.height).data,base+'/#document='+id);
     stage='download'; const downloadEvent=page.waitForEvent('download'); await page.locator('#download').click();
     const downloaded=await downloadEvent; assert.deepEqual(await fs.readFile(await downloaded.path()),file.buffer);
     stage='valid verification'; await page.locator('#verify-file').setInputFiles(file); await page.locator('#verify button').click(); await waitText('#verification','VALID —');
@@ -43,7 +53,11 @@ const root = path.resolve(__dirname, '..');
     stage='revoke'; await page.locator('#reason').fill('Synthetic browser test completed'); await page.locator('#confirm-revoke').check(); await page.locator('#revoke button').click();
     await waitText('#record-state','REVOKED'); assert.equal(await page.locator('#download').isDisabled(),true);
     await page.locator('#verify-file').setInputFiles(file); await page.locator('#verify button').click(); await waitText('#verification','REVOKED');
-    await page.locator('#history').click(); await waitText('#history-result',id);
+    await page.locator('#history').click(); await waitText('#history-summary',id);
+    assert.equal(await page.locator('#history-timeline li').count(),2);
+    assert.match(await page.locator('#history-timeline').textContent(),/Document revoked/);
+    stage='dashboard status filter'; await page.locator('#dashboard-tab').click(); await page.locator('#search-status').selectOption('ACTIVE'); await page.locator('#search button').click(); await waitText('#search-results','No accessible documents');
+    await page.locator('#search-status').selectOption('REVOKED'); await page.locator('#search button').click(); await waitText('#search-results',id);
     stage='signout and reader'; await page.locator('#logout').click(); assert.equal(await page.locator('#record').isVisible(),false);
     await login('reader'); assert.equal(await page.locator('#issue-tab').isVisible(),false);
     await page.locator('#lookup-id').fill(id); await page.locator('#find button').click(); await waitText('#record-id',id);

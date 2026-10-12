@@ -31,7 +31,7 @@ case "${1:-}" in
     ;;
   deployCC)
     runtime_hash="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["image_id"].split(":")[1][:12])' "$ROOT_DIR/.runtime/node-runtime.json")"
-    ./network.sh deployCC -c govchannel -ccn docregistry -ccp "$ROOT_DIR/chaincode/docregistry" -ccl javascript -ccv "${CC_VERSION:-2.2-$runtime_hash}" -ccs "${CC_SEQUENCE:-auto}" > "$ROOT_DIR/.runtime/logs/chaincode-deploy.log" 2>&1
+    ./network.sh deployCC -c govchannel -ccn docregistry -ccp "$ROOT_DIR/chaincode/docregistry" -ccl javascript -ccv "${CC_VERSION:-2.3-$runtime_hash}" -ccs "${CC_SEQUENCE:-auto}" > "$ROOT_DIR/.runtime/logs/chaincode-deploy.log" 2>&1
     echo 'docregistry deployment completed.'
     ;;
   status) docker compose -f compose/compose-test-net.yaml ps ;;

@@ -91,3 +91,30 @@ test("registration exposes all five arguments to the Fabric dispatcher", () => {
   const Contract = require("../index").contracts[0];
   assert.equal(Contract.prototype.registerDocument.length, 6);
 });
+
+test('search filters department, citizen owner, status, and bounds pages', async () => {
+  const c=new Contract(), ctx=context(); let closed=0;
+  ctx.stub.getStateByRange=async(start,end)=>{
+    const entries=[...ctx.state.entries()].filter(([key])=>key>=start&&(!end||key<end)).sort(([a],[b])=>a.localeCompare(b));let index=0;
+    return {next:async()=>index<entries.length?{done:false,value:{key:entries[index][0],value:entries[index++][1]}}:{done:true},close:async()=>closed++};
+  };
+  for(let i=0;i<25;i++) await issue(c,ctx,'SEARCH-'+String(i).padStart(3,'0'),JSON.stringify({ownerSubjectHash:HASH}));
+  await issue(c,ctx,'SEARCH-OTHER',JSON.stringify({ownerSubjectHash:'sha256:'+'b'.repeat(64)}));
+  const foreign=JSON.parse(ctx.state.get('SEARCH-OTHER'));foreign.issuerMspId='OtherMSP';ctx.state.set('SEARCH-OTHER',Buffer.from(JSON.stringify(foreign)));
+  await c.revokeDocument(ctx,'SEARCH-000','reason');
+  const first=JSON.parse(await c.searchDocuments(ctx,'SEARCH-','ACTIVE',HASH,''));
+  assert.equal(first.items.length,20);assert.equal(first.items[0].docId,'SEARCH-001');
+  const second=JSON.parse(await c.searchDocuments(ctx,'SEARCH-','ACTIVE',HASH,first.nextAfter));
+  assert.equal(second.items.length,4);assert.equal(second.nextAfter,'');
+  assert.equal(JSON.parse(await c.searchDocuments(ctx,'SEARCH-','REVOKED',HASH,'')).items.length,1);
+  assert.equal(JSON.parse(await c.searchDocuments(ctx,'SEARCH-','ALL','sha256:'+'c'.repeat(64),'')).items.length,0);
+  await assert.rejects(()=>c.searchDocuments(context('reader'),'','ALL','',''),/FORBIDDEN/);
+  assert.equal(closed,4);assert.equal(Contract.prototype.searchDocuments.length,5);
+});
+
+test('search stops scanning at 250 records even when none are visible', async () => {
+  const c=new Contract(),ctx=context();let reads=0,closed=false;
+  ctx.stub.getStateByRange=async()=>({next:async()=>({done:false,value:{key:'HIDDEN-'+String(++reads),value:Buffer.from(JSON.stringify({docType:'document',issuer:'Other',issuerMspId:'OtherMSP'}))}}),close:async()=>{closed=true;}});
+  const result=JSON.parse(await c.searchDocuments(ctx,'','ALL','',''));
+  assert.equal(result.items.length,0);assert.equal(result.nextAfter,'HIDDEN-250');assert.equal(reads,251);assert.equal(closed,true);
+});

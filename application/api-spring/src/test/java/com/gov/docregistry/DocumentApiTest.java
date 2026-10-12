@@ -95,6 +95,21 @@ class DocumentApiTest {
   }
 
   @Test
+  void searchRequiresReaderAndEncryptsAndBindsItsCursor() throws Exception {
+    mvc.perform(get("/api/documents")).andExpect(status().isUnauthorized());
+    var result = mapper.createObjectNode(); result.putArray("items"); result.put("nextAfter", "PRIVATE-OTHER-ID");
+    when(ledger.search("", "ALL", "", "")).thenReturn(result);
+    String body = mvc.perform(get("/api/documents").with(httpBasic("test-reader", "test-only-passphrase")))
+        .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+    String cursor = mapper.readTree(body).path("nextCursor").asText();
+    Assertions.assertFalse(body.contains("PRIVATE-OTHER-ID"));
+    when(ledger.search("", "ALL", "", "PRIVATE-OTHER-ID")).thenReturn(mapper.createObjectNode().put("nextAfter", "").set("items", mapper.createArrayNode()));
+    mvc.perform(get("/api/documents").param("cursor", cursor).with(httpBasic("test-reader", "test-only-passphrase"))).andExpect(status().isOk());
+    mvc.perform(get("/api/documents").param("cursor", cursor).param("status", "REVOKED").with(httpBasic("test-reader", "test-only-passphrase"))).andExpect(status().isBadRequest());
+    mvc.perform(get("/api/documents").param("cursor", "malformed").with(httpBasic("test-reader", "test-only-passphrase"))).andExpect(status().isBadRequest());
+  }
+
+  @Test
   void anonymousDocumentAccessIsDenied() throws Exception {
     mvc.perform(get("/api/documents/DOC-001")).andExpect(status().isUnauthorized());
     mvc.perform(

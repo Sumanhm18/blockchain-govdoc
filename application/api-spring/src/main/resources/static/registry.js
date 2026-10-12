@@ -3,6 +3,9 @@
   const $ = id => document.getElementById(id);
   let authorization = '', roles = [], currentId = '', generation = 0, recordVersion = 0;
   const active = new Set();
+  let identitySession = false, searchVersion = 0, nextCursor = '';
+  const recent = [];
+  function recordFromLink() { return /^#document=([A-Z0-9-]{3,50})$/.exec(location.hash)?.[1] || ''; }
   let trackingVersion = 0, trackingTimer, confirmedId = '';
   function stopTracking() { trackingVersion++; clearTimeout(trackingTimer); $('tracking-note').textContent = ''; }
   const max = 10 * 1024 * 1024;
@@ -53,9 +56,13 @@
   function clearRecord() {
     recordVersion++; currentId = ''; $('record').hidden = true; $('record-details').replaceChildren();
     $('verification').hidden = true; $('history-section').hidden = true; $('history-result').textContent = '';
-    $('verify').reset(); $('revoke').reset();
+    $('verify').reset(); $('revoke').reset(); $('share-section').hidden = true; $('share-link').value = '';
+    $('history-timeline').replaceChildren(); $('history-summary').textContent = '';
   }
-  function signout() {
+  function signout(keepIdentity = false) {
+    if (!keepIdentity) window.dispatchEvent(new Event('registry-identity-clear'));
+    identitySession = false; recent.length = 0; searchVersion++; nextCursor = '';
+    $('recent-documents').replaceChildren(); $('search-results').replaceChildren(); $('search-more').hidden = true;
     stopTracking(); confirmedId = ''; generation++; active.forEach(c => c.abort()); authorization = ''; roles = []; clearRecord();
     document.querySelectorAll('form').forEach(f => f.reset());
     $('workspace').hidden = true; $('connection').hidden = false; $('notice').hidden = true;
@@ -68,8 +75,8 @@
     $('username').required = basic; $('password').required = basic; $('token').required = !basic;
     $('password').value = ''; $('token').value = '';
   }
-  $('auth-mode').addEventListener('change', modeChanged); $('logout').addEventListener('click', signout);
-  window.addEventListener('pagehide', signout);
+  $('auth-mode').addEventListener('change', modeChanged); $('logout').addEventListener('click', () => { const remote = identitySession; signout(remote); if (remote) window.dispatchEvent(new Event('registry-identity-logout')); });
+  window.addEventListener('pagehide', () => signout());
   bind('login', async () => {
     const mode = $('auth-mode').value;
     if (mode === 'basic') {
@@ -78,13 +85,62 @@
     } else authorization = 'Bearer ' + $('token').value.trim();
     $('password').value = ''; $('token').value = '';
     try {
-      const session = await (await request('/api/session')).json(); roles = session.roles;
-      $('roles').textContent = `Access: ${roles.join(', ')}`;
-      $('connection').hidden = true; $('workspace').hidden = false;
-      $('issue-tab').hidden = !roles.includes('ISSUER'); $('owner-field').hidden = mode !== 'bearer';
-      selectPanel(roles.some(r => ['READER', 'CITIZEN'].includes(r)) ? 'lookup' : roles.includes('ISSUER') ? 'issue' : 'lookup');
+      await connected(mode === 'bearer');
     } catch (error) { authorization = ''; throw error; }
   });
+  async function connected(bearer) {
+    const session = await (await request('/api/session')).json(); roles = session.roles;
+    $('roles').textContent = `Access: ${roles.join(', ')}`;
+    $('connection').hidden = true; $('workspace').hidden = false;
+    const reader = roles.some(r => ['READER', 'CITIZEN'].includes(r));
+    $('issue-tab').hidden = !roles.includes('ISSUER'); $('owner-field').hidden = !bearer;
+    $('dashboard-tab').hidden = !reader;
+    const linked = recordFromLink();
+    selectPanel(reader ? (linked ? 'lookup' : 'dashboard') : roles.includes('ISSUER') ? 'issue' : 'lookup');
+    const ticket = generation;
+    if (reader && linked) {
+      $('lookup-id').value = linked;
+      try { await loadRecord(linked); } catch (error) { if (ticket === generation) show('notice', error.message, 'error'); }
+    } else if (reader) searchPage('').catch(error => { if (ticket === generation) show('notice', error.message, 'error'); });
+  }
+  window.addEventListener('registry-identity-token', async event => {
+    authorization = 'Bearer ' + event.detail; identitySession = true;
+    try { await connected(true); } catch (error) { signout(); show('notice', error.message, 'error'); }
+  });
+  window.addEventListener('registry-identity-error', event => show('notice', event.detail, 'error'));
+  window.addEventListener('hashchange', async () => {
+    const id = recordFromLink(); if (!authorization || !id) return;
+    selectPanel('lookup'); $('lookup-id').value = id;
+    try { await loadRecord(id); } catch (error) { show('notice', error.message, 'error'); }
+  });
+  async function searchPage(cursor) {
+    const version = ++searchVersion;
+    const params = new URLSearchParams({prefix:$('search-prefix').value, status:$('search-status').value, cursor});
+    $('search-more').hidden = true;
+    const result = await (await request('/api/documents?'+params)).json();
+    if (version !== searchVersion) return;
+    $('search-results').replaceChildren();
+    for (const record of result.items) {
+      const row = document.createElement('div'); row.className = 'document-row';
+      const text = document.createElement('div'), title = document.createElement('strong'), detail = document.createElement('p');
+      title.textContent = record.docId; detail.textContent = `${record.revoked ? 'Revoked' : 'Active'} · ${record.issuer} · ${record.createdAt || ''}`;
+      const button = document.createElement('button'); button.className = 'secondary'; button.textContent = 'Open';
+      button.addEventListener('click', () => openRecord(record.docId));
+      text.append(title,detail); row.append(text,button); $('search-results').append(row);
+    }
+    nextCursor = result.nextCursor; $('search-more').hidden = !nextCursor;
+    if (!result.items.length) $('search-results').textContent = nextCursor ? 'No matching records in this scanned page. Continue to the next page or narrow the prefix.' : 'No accessible documents match this search.';
+  }
+  async function openRecord(id) {
+    const ticket = generation; selectPanel('lookup'); $('lookup-id').value = id;
+    try { await loadRecord(id); } catch (error) { if (ticket === generation) show('notice', error.message, 'error'); }
+  }
+  bind('search', () => searchPage(''));
+  $('search-more').addEventListener('click', async () => {
+    const cursor = nextCursor; if (!cursor) return;
+    try { await searchPage(cursor); } catch (error) { show('notice', error.message, 'error'); }
+  });
+  for (const id of ['search-prefix','search-status']) $(id).addEventListener('input', () => { searchVersion++; nextCursor=''; $('search-more').hidden=true; $('search-results').replaceChildren(); });
   function selectPanel(name) {
     document.querySelectorAll('.task').forEach(p => p.hidden = p.id !== name);
     document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.panel === name));
@@ -94,6 +150,9 @@
   async function loadRecord(id) {
     clearRecord(); const version = recordVersion; const record = await (await request(`/api/documents/${encodeURIComponent(id)}`)).json();
     if (version !== recordVersion) return;
+    const index = recent.indexOf(id); if (index >= 0) recent.splice(index, 1); recent.unshift(id); recent.splice(6);
+    $('recent-documents').replaceChildren();
+    for (const entry of recent) { const button = document.createElement('button'); button.className='secondary'; button.textContent=entry; button.addEventListener('click', () => openRecord(entry)); $('recent-documents').append(button); }
     currentId = id; $('record-id').textContent = id; $('record-state').textContent = record.revoked ? 'REVOKED' : 'ACTIVE';
     $('record-state').className = 'badge' + (record.revoked ? ' error' : '');
     for (const [label, value] of [['Issuing department', record.issuer], ['Issuer MSP', record.issuerMspId], ['Document digest', record.hash], ['Subject reference', record.subject], ['Revocation reason', record.revocationReason]]) {
@@ -190,8 +249,37 @@
     try {
       const result = await (await request(`/api/documents/${encodeURIComponent(id)}/history`)).json();
       if (ticket !== generation || id !== currentId) return;
-      $('history-result').textContent = JSON.stringify(result, null, 2); $('history-section').hidden = false;
+      $('history-result').textContent = JSON.stringify(result, null, 2);
+      $('history-summary').textContent = result.truncated ? 'Showing the first 100 events. Additional history exists.' : `History for ${id}`;
+      $('history-timeline').replaceChildren();
+      for (const event of result.events) {
+        const item = document.createElement('li'), heading = document.createElement('strong'), detail = document.createElement('p'), transaction = document.createElement('p');
+        const record = event.document;
+        heading.textContent = event.deleted ? 'Record deleted' : record?.revoked ? 'Document revoked' : 'Document issued';
+        detail.textContent = event.deleted ? 'Deletion recorded on the ledger.' : `${record?.updatedAt || record?.createdAt || 'Timestamp unavailable'}${record?.revoked ? ' · '+record.revocationReason : ''}`;
+        transaction.textContent = 'Transaction: '+event.txId;
+        item.append(heading,detail,transaction); $('history-timeline').append(item);
+      }
+      $('history-section').hidden = false;
     } catch (e) { if (ticket === generation && e.name !== 'AbortError') show('notice', e.message, 'error'); }
+  });
+  $('share').addEventListener('click', () => {
+    const url = location.origin + '/#document=' + encodeURIComponent(currentId);
+    $('share-link').value = url;
+    const qr = qrcode(0,'M'); qr.addData(url); qr.make();
+    const count = qr.getModuleCount(), cell = 6, quiet = 4, canvas = $('share-qr');
+    canvas.width = canvas.height = (count + quiet * 2) * cell;
+    const context = canvas.getContext('2d'); context.fillStyle='#fff'; context.fillRect(0,0,canvas.width,canvas.height); context.fillStyle='#000';
+    for(let row=0;row<count;row++) for(let col=0;col<count;col++) if(qr.isDark(row,col)) context.fillRect((col+quiet)*cell,(row+quiet)*cell,cell,cell);
+    $('share-section').hidden = false;
+  });
+  $('copy-link').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText($('share-link').value); show('notice','Verification link copied.'); }
+    catch { $('share-link').select(); show('notice','Select and copy the verification link above.'); }
+  });
+  $('download-qr').addEventListener('click', () => {
+    const id=currentId;
+    $('share-qr').toBlob(blob => { const url=URL.createObjectURL(blob), anchor=document.createElement('a'); anchor.href=url; anchor.download=id+'-verification.png'; anchor.click(); setTimeout(()=>URL.revokeObjectURL(url),1000); },'image/png');
   });
   fetch('/actuator/health/readiness', { cache: 'no-store', credentials: 'omit' }).then(r => { $('health').textContent = r.ok ? 'Service ready' : 'Service unavailable'; }).catch(() => { $('health').textContent = 'Service unavailable'; });
 })();

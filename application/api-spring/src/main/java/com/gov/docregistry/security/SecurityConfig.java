@@ -42,16 +42,26 @@ public class SecurityConfig {
       @Value("${registry.rate-limit.per-minute:120}") int rateLimit,
       @Value("${registry.rate-limit.per-ip-minute:600}") int ingressLimit)
       throws Exception {
+    String identityOrigin = "";
+    if (!issuer.isBlank()) {
+      var uri = java.net.URI.create(issuer);
+      if (!"https".equals(uri.getScheme()) || uri.getHost() == null || uri.getUserInfo() != null)
+        throw new IllegalStateException("Identity issuer must be an HTTPS URL");
+      identityOrigin = " https://" + uri.getHost() + (uri.getPort() == -1 ? "" : ":" + uri.getPort());
+    }
+    final String connections = "'self'" + identityOrigin;
     http.csrf(c -> c.disable())
         .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .requestCache(c -> c.disable())
         .headers(h -> h.contentSecurityPolicy(c -> c.policyDirectives(
-            "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; "
+            "default-src 'none'; script-src 'self'; style-src 'self'; connect-src " + connections + "; "
                 + "img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")))
+        .headers(h -> h.addHeaderWriter(new org.springframework.security.web.header.writers.StaticHeadersWriter("Referrer-Policy", "no-referrer")))
         .cors(c -> c.configurationSource(cors(origins)))
         .authorizeHttpRequests(
             a ->
                 a.requestMatchers("/", "/index.html", "/registry.css", "/registry.js",
+                        "/oidc.js", "/vendor/keycloak.js", "/vendor/qrcode.js", "/api/client-config",
                         "/actuator/health", "/actuator/health/**")
                     .permitAll()
                     .requestMatchers("/actuator/**")

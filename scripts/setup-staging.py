@@ -35,6 +35,7 @@ if not credentials.exists():
           {'name':'audience','protocol':'openid-connect','protocolMapper':'oidc-audience-mapper','config':{'included.custom.audience':'govdoc-api','access.token.claim':'true'}}]}],
       'users':[{'id':entry['id'],'username':name,'enabled':True,'emailVerified':True,'firstName':'Synthetic','lastName':'Fixture','email':name+'@example.invalid','credentials':[{'type':'password','value':entry['password'],'temporary':False}],
           'realmRoles': ['ISSUER','REVOKER','READER'] if name=='issuer' else ['READER'] if name=='reader' else ['CITIZEN']} for name,entry in accounts.items()]}
+    realm['clients'].append(json.loads((root/'config/browser-client.json').read_text()))
     target=folder/'import/govdoc-lab-realm.json';target.write_text(json.dumps(realm));target.chmod(0o640)
     (folder/'private/containers.env').write_text('POSTGRES_PASSWORD='+config['databasePassword']+'\nKC_DB_PASSWORD='+config['databasePassword']+'\nKC_BOOTSTRAP_ADMIN_USERNAME=staging-admin\nKC_BOOTSTRAP_ADMIN_PASSWORD='+config['adminPassword']+'\n')
 if not (folder/'private/encryption.json').exists():

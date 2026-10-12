@@ -222,6 +222,27 @@ class SignedJwtApiTest {
   }
 
   @Test
+  void searchDerivesCitizenOwnerAndRejectsForeignResults() throws Exception {
+    var result = new ObjectMapper().createObjectNode(); result.putArray("items"); result.put("nextAfter", "");
+    when(ledger.search(eq(""), eq("ALL"), startsWith("sha256:"), eq(""))).thenReturn(result);
+    mvc.perform(get("/api/documents").with(https()).header("Authorization", "Bearer " + valid(List.of("CITIZEN"))))
+        .andExpect(status().isOk());
+    verify(ledger).search(eq(""), eq("ALL"), startsWith("sha256:"), eq(""));
+    var page = new ObjectMapper().createObjectNode(); page.putArray("items"); page.put("nextAfter", "PRIVATE-OTHER-ID");
+    when(ledger.search("", "ALL", "", "")).thenReturn(page);
+    String json = mvc.perform(get("/api/documents").with(https()).header("Authorization", "Bearer " + valid(List.of("READER"))))
+        .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+    String readerCursor = new ObjectMapper().readTree(json).path("nextCursor").asText();
+    mvc.perform(get("/api/documents").param("cursor", readerCursor).with(https()).header("Authorization", "Bearer " + valid(List.of("CITIZEN"))))
+        .andExpect(status().isBadRequest());
+    result.withArray("items").addObject().put("issuer", "Other").put("issuerMspId", "OtherMSP");
+    mvc.perform(get("/api/documents").with(https()).header("Authorization", "Bearer " + valid(List.of("CITIZEN"))))
+        .andExpect(status().isNotFound());
+    mvc.perform(get("/api/documents").with(https()).header("Authorization", "Bearer " + valid(List.of("ISSUER"))))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
   void departmentReaderCannotReadAnotherDepartmentsRecord() throws Exception {
     var other =
         new ObjectMapper().createObjectNode().put("issuer", "Org2").put("issuerMspId", "Org2MSP");

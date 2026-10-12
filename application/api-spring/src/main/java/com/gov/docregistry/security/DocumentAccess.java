@@ -33,6 +33,15 @@ public class DocumentAccess {
     return DocumentCrypto.hash((issuer + "\u0000" + subject).getBytes(StandardCharsets.UTF_8));
   }
 
+  public String searchOwner() {
+    var auth = SecurityContextHolder.getContext().getAuthentication();
+    if (auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_READER"))) return "";
+    if (auth instanceof JwtAuthenticationToken jwt
+        && auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_CITIZEN")))
+      return ownerHash(jwt.getToken().getIssuer().toString(), jwt.getToken().getSubject());
+    throw RegistryException.forbidden();
+  }
+
   public void requireRead(JsonNode record) {
     var auth = SecurityContextHolder.getContext().getAuthentication();
     boolean sameDepartment =

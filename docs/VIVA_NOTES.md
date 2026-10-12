@@ -33,13 +33,13 @@ The API validates accounts or JWTs and enforces role, department and ownership r
 A durable H2 journal keeps encrypted upload state. A pending operation returns HTTP 202. Recovery queries the ledger before resubmitting to avoid duplicate registration after uncertain outcomes. IPFS and Fabric do not share an atomic transaction.
 
 **What did you test?**
-The dated record contains 42 Java tests, 15 contract tests, 16 live API checks, two direct Fabric authorization checks, 37 HTTPS/OIDC checks and a 14-check presentation walkthrough. Recovery and encrypted application/IPFS restore drills passed. These suites overlap in coverage, so their sum is not a count of distinct security guarantees.
+The dated record contains 44 Java tests, 17 contract tests, 16 live API checks, two direct Fabric authorization checks, 37 HTTPS/OIDC checks and a 14-check presentation walkthrough. Recovery and encrypted application/IPFS restore drills passed. These suites overlap in coverage, so their sum is not a count of distinct security guarantees.
 
 **What is your contribution?**
 Integrating the document lifecycle with encrypted storage, department/citizen access, revocation-aware verification, chaincode authorization and durable recovery, then validating those behaviors. Fabric, IPFS and the cryptographic algorithms are existing technologies.
 
 **What remains unfinished?**
-Residual dependency findings block release. GitHub hosted CI cannot start because of the account billing lock. Real citizen proofing, managed keys, off-site backups, resilient infrastructure and full Fabric ledger restoration remain. The web interface supports the core lifecycle. QR verification and production citizen login remain future work.
+Residual dependency findings block release. GitHub hosted CI cannot start because of the account billing lock. Real citizen proofing, managed keys, off-site backups, resilient infrastructure and full Fabric ledger restoration remain. The web interface supports the core lifecycle. QR links and local Keycloak PKCE sign-in are implemented. Real identity proofing and production infrastructure remain future work.
 
 **Is the system highly available or production-ready?**
 No. This local topology has one orderer and a single API journal. Losing a required endorser prevents writes. Recovery tests demonstrate specific fault handling, not uninterrupted service or production certification.

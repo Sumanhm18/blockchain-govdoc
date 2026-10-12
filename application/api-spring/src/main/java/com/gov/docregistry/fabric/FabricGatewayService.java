@@ -139,6 +139,10 @@ public class FabricGatewayService implements DocumentLedger {
     return call(false, "getDocumentHistory", id);
   }
 
+  public JsonNode search(String prefix, String status, String owner, String after) {
+    return call(false, "searchDocuments", prefix, status, owner, after);
+  }
+
   public void ping() {
     call(false, "ping");
   }
