@@ -33,6 +33,8 @@ python3 scripts/resume-demo.py
 
 A rehearsal stopped and resumed all eight managed development services and reran all 14 checks successfully. The CLI shows safe synthetic evidence, not passwords or tokens. Successful output ends with **PASS: 14 checks** and writes `.runtime/submission/demo-evidence.json`. If the demo fails, do not present a prior evidence file as a live success. Inspect readiness/private logs and rerun. A temporary HTTP 202 is a pending durable upload, not success; the walkthrough waits for ledger confirmation.
 
+For a spoken opening, expanded viva answers and presentation-day troubleshooting, use [Viva notes](VIVA_NOTES.md). Personal report details are deferred to the author.
+
 ## Questions you should be able to answer
 
 - **Why Fabric?** Membership and endorsement policies suit a consortium of known departments. The prototype has two organizations; both endorse writes under its policy.
