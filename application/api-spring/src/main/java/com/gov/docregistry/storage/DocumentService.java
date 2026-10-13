@@ -49,6 +49,7 @@ public class DocumentService {
     for (String key : List.of("registrationId", "encryption", "ipfsCid", "ownerSubjectHash"))
       if (metadata.has(key))
         throw RegistryException.validation("Storage metadata is managed by the upload endpoint");
+    validateExpiry(metadata);
     addOwner(metadata, request.ownerSubject());
     return ledger.register(
         request.docId(), request.hash(), issuer, orEmpty(request.subject()), metadata.toString());
@@ -66,6 +67,11 @@ public class DocumentService {
       String type,
       String ownerSubject,
       MultipartFile file) {
+    return upload(id, requestedIssuer, subject, type, ownerSubject, null, file);
+  }
+
+  public synchronized JsonNode upload(String id, String requestedIssuer, String subject, String type,
+      String ownerSubject, String expiresAt, MultipartFile file) {
     checkIssuer(requestedIssuer);
     byte[] bytes = bytes(file);
     String mediaType = mediaType(bytes);
@@ -79,6 +85,8 @@ public class DocumentService {
     ObjectNode meta = request.putObject("metadata");
     meta.put("type", orEmpty(type));
     meta.put("mediaType", mediaType);
+    if (expiresAt != null && !expiresAt.isBlank()) meta.put("expiresAt", expiresAt);
+    validateExpiry(meta);
     addOwner(meta, ownerSubject);
     String fingerprint = DocumentCrypto.hash(request.toString().getBytes(StandardCharsets.UTF_8));
     Optional<UploadJournal.Job> prior = journal.find(id);
@@ -196,6 +204,8 @@ public class DocumentService {
     JsonNode record = ledger.get(id);
     if (record.path("revoked").asBoolean())
       throw new RegistryException("REVOKED", HttpStatus.CONFLICT, "Document has been revoked");
+    if (isExpired(record))
+      throw new RegistryException("EXPIRED", HttpStatus.CONFLICT, "Document has expired");
     JsonNode meta = record.path("metadata");
     JsonNode encryption = meta.path("encryption");
     if (!"AES-256-GCM".equals(encryption.path("algorithm").asText())
@@ -259,6 +269,23 @@ public class DocumentService {
     } catch (tools.jackson.core.JacksonException e) {
       throw RegistryException.validation("Metadata must be valid JSON without duplicate fields");
     }
+  }
+
+  private void validateExpiry(ObjectNode metadata) {
+    if (!metadata.has("expiresAt")) return;
+    String value = metadata.path("expiresAt").asText();
+    try {
+      if (!metadata.path("expiresAt").isString() || !value.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z")
+          || !new java.time.format.DateTimeFormatterBuilder().appendInstant(3).toFormatter().format(java.time.Instant.parse(value)).equals(value))
+        throw new IllegalArgumentException();
+    } catch (RuntimeException e) { throw RegistryException.validation("Expiry must be a valid UTC timestamp with milliseconds"); }
+  }
+
+  public static boolean isExpired(JsonNode record) {
+    String value = record.path("metadata").path("expiresAt").asText("");
+    if (value.isEmpty()) return false;
+    try { return !java.time.Instant.parse(value).isAfter(java.time.Instant.now()); }
+    catch (java.time.DateTimeException e) { throw RegistryException.validation("Record has invalid expiry metadata; review is required"); }
   }
 
   private void addOwner(ObjectNode metadata, String subject) {

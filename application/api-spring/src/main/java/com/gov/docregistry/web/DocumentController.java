@@ -44,8 +44,9 @@ public class DocumentController {
       @RequestParam(value = "subject", defaultValue = "") @Size(max = 128) String subject,
       @RequestParam(value = "type", defaultValue = "") @Size(max = 64) String type,
       @RequestParam(value = "ownerSubject", defaultValue = "") @Size(max = 256)
-          String ownerSubject) {
-    return documents.upload(docId, issuer, subject, type, ownerSubject, file);
+          String ownerSubject,
+      @RequestParam(value = "expiresAt", defaultValue = "") @Size(max = 24) String expiresAt) {
+    return documents.upload(docId, issuer, subject, type, ownerSubject, expiresAt, file);
   }
 
   @GetMapping("/{docId}")
@@ -53,7 +54,9 @@ public class DocumentController {
   public JsonNode get(@PathVariable @Pattern(regexp = Requests.ID) String docId) {
     JsonNode record = ledger.get(docId);
     access.requireRead(record);
-    return record;
+    var view = (tools.jackson.databind.node.ObjectNode) record.deepCopy();
+    view.put("effectiveStatus", record.path("revoked").asBoolean() ? "REVOKED" : DocumentService.isExpired(record) ? "EXPIRED" : "ACTIVE");
+    return view;
   }
 
   @PostMapping(value = "/{docId}/verify", consumes = MediaType.APPLICATION_JSON_VALUE)

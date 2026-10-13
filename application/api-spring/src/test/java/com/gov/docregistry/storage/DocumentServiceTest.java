@@ -73,6 +73,26 @@ class DocumentServiceTest {
   }
 
   @Test
+  void expiryIsStoredAndBlocksDownloadBeforeStorageRead() throws Exception {
+    JsonNode result = service.upload("EXP-001", "", "", "", null, "2020-01-01T00:00:00.000Z", upload());
+    assertEquals("2020-01-01T00:00:00.000Z", result.path("metadata").path("expiresAt").asText());
+    doReturn(result).when(ledger).get("EXP-001");
+    assertEquals("EXPIRED", assertThrows(RegistryException.class, () -> service.download("EXP-001")).code());
+    verify(ipfs, never()).getBytes(anyString());
+    assertTrue(DocumentService.isExpired(result));
+  }
+
+  @Test
+  void invalidExpiryRejectedBeforeStorageOrJournalAndRetryBindsExpiry() throws Exception {
+    for (String expiry : List.of("2026-02-30T00:00:00.000Z", "not-a-date", "2026-01-01T00:00:00Z"))
+      assertThrows(RegistryException.class, () -> service.upload("EXP-001", "", "", "", null, expiry, upload()));
+    verifyNoInteractions(ipfs);
+    assertTrue(journal.find("EXP-001").isEmpty());
+    service.upload("EXP-001", "", "", "", null, "2099-01-01T00:00:00.000Z", upload());
+    assertEquals("DUPLICATE", assertThrows(RegistryException.class, () -> service.upload("EXP-001", "", "", "", null, "2099-02-01T00:00:00.000Z", upload())).code());
+  }
+
+  @Test
   void encryptsBeforeIpfsAndStoresSafeMetadata() throws Exception {
     JsonNode result = service.upload("DOC-001", "", "opaque", "type\"quote", upload());
     assertEquals(cid, result.path("metadata").path("ipfsCid").asText());

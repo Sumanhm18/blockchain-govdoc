@@ -15,5 +15,7 @@ public interface DocumentLedger {
 
   JsonNode search(String prefix, String status, String owner, String after);
 
+  JsonNode summary(String owner);
+
   void ping();
 }

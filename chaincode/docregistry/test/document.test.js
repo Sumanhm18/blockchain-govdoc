@@ -118,3 +118,49 @@ test('search stops scanning at 250 records even when none are visible', async ()
   const result=JSON.parse(await c.searchDocuments(ctx,'','ALL','',''));
   assert.equal(result.items.length,0);assert.equal(result.nextAfter,'HIDDEN-250');assert.equal(reads,251);assert.equal(closed,true);
 });
+
+function range(ctx) {
+  ctx.stub.getStateByRange=async(start,end)=>{
+    const entries=[...ctx.state.entries()].filter(([key])=>key>=start&&(!end||key<end)).sort(([a],[b])=>a.localeCompare(b));let i=0;
+    return {next:async()=>i<entries.length?{done:false,value:{key:entries[i][0],value:entries[i++][1]}}:{done:true},close:async()=>{}};
+  };
+}
+test('expiry boundary is deterministic and revocation takes precedence', async()=>{
+  const c=new Contract(),ctx=context();
+  await issue(c,ctx,'EXP-001',JSON.stringify({expiresAt:'2023-11-14T22:13:21.000Z'}));
+  assert.equal(JSON.parse(await c.verifyDocument(ctx,'EXP-001',HASH)).status,'VALID');
+  ctx.tick();
+  for(const hash of [HASH,'sha256:'+'b'.repeat(64)]) {
+    const result=JSON.parse(await c.verifyDocument(ctx,'EXP-001',hash));
+    assert.equal(result.status,'EXPIRED');assert.equal(result.valid,false);assert.equal(result.expired,true);
+  }
+  assert.equal(ctx.writes(),1);
+  await c.revokeDocument(ctx,'EXP-001','revoked after expiry');
+  assert.equal(JSON.parse(await c.verifyDocument(ctx,'EXP-001',HASH)).status,'REVOKED');
+});
+test('invalid expiry is rejected without writes',async()=>{
+  const c=new Contract(),ctx=context();
+  for(const expiresAt of ['',null,42,'2026-02-30T00:00:00.000Z','2026-01-01','2026-01-01T00:00:00+05:30'])
+    await assert.rejects(()=>issue(c,ctx,'EXP-001',JSON.stringify({expiresAt})),/VALIDATION/);
+  assert.equal(ctx.writes(),0);
+});
+test('summary and expiry search respect ownership and department',async()=>{
+  const c=new Contract(),ctx=context();range(ctx);
+  await issue(c,ctx,'SUM-A',JSON.stringify({ownerSubjectHash:HASH}));ctx.tick();
+  await issue(c,ctx,'SUM-E',JSON.stringify({ownerSubjectHash:HASH,expiresAt:'2020-01-01T00:00:00.000Z'}));ctx.tick();
+  await issue(c,ctx,'SUM-R',JSON.stringify({ownerSubjectHash:HASH}));await c.revokeDocument(ctx,'SUM-R','reason');
+  await issue(c,ctx,'SUM-OTHER','{}');
+  const foreign=JSON.parse(ctx.state.get('SUM-OTHER'));foreign.issuer='Other';ctx.state.set('SUM-OTHER',Buffer.from(JSON.stringify(foreign)));
+  const result=JSON.parse(await c.documentSummary(ctx,HASH));
+  assert.deepEqual(result.counts,{total:3,active:1,expired:1,revoked:1});assert.equal(result.complete,true);
+  assert.equal(result.recent[0].docId,'SUM-R');assert.equal(result.recent.some(x=>x.docId==='SUM-OTHER'),false);
+  const expired=JSON.parse(await c.searchDocuments(ctx,'SUM-','EXPIRED',HASH,''));assert.equal(expired.items.length,1);assert.equal(expired.items[0].effectiveStatus,'EXPIRED');
+  assert.equal(JSON.parse(await c.searchDocuments(ctx,'SUM-','ACTIVE',HASH,'')).items.length,1);
+  await assert.rejects(()=>c.documentSummary(context('reader'),''),/FORBIDDEN/);
+  assert.equal(Contract.prototype.documentSummary.length,2);
+});
+test('summary labels capped scans incomplete and closes iterator',async()=>{
+  const c=new Contract(),ctx=context();let reads=0,closed=false;
+  ctx.stub.getStateByRange=async()=>({next:async()=>({value:{key:String(++reads),value:Buffer.from('{"docType":"document","issuer":"Other"}')}}),close:async()=>{closed=true;}});
+  const result=JSON.parse(await c.documentSummary(ctx,''));assert.equal(result.complete,false);assert.equal(result.counts.total,0);assert.equal(reads,5001);assert.equal(closed,true);
+});

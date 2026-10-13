@@ -22,11 +22,18 @@ public class DocumentSearchController {
   public DocumentSearchController(DocumentLedger ledger, DocumentAccess access, DocumentCrypto crypto, ObjectMapper mapper) {
     this.ledger = ledger; this.access = access; this.crypto = crypto; this.mapper = mapper;
   }
+  @GetMapping("/api/documents/summary")
+  @PreAuthorize("hasAnyRole('READER','CITIZEN')")
+  public tools.jackson.databind.JsonNode summary() {
+    var result = ledger.summary(access.searchOwner());
+    for (var record : result.path("recent")) access.requireRead(record);
+    return result;
+  }
   @GetMapping("/api/documents")
   @PreAuthorize("hasAnyRole('READER','CITIZEN')")
   public Map<String, Object> search(
       @RequestParam(defaultValue = "") @Pattern(regexp = "[A-Z0-9-]{0,50}") String prefix,
-      @RequestParam(defaultValue = "ALL") @Pattern(regexp = "ALL|ACTIVE|REVOKED") String status,
+      @RequestParam(defaultValue = "ALL") @Pattern(regexp = "ALL|ACTIVE|REVOKED|EXPIRED") String status,
       @RequestParam(defaultValue = "") @Size(max = 8192) String cursor) {
     String owner = access.searchOwner();
     String binding = prefix + "\u0000" + status + "\u0000" + owner;

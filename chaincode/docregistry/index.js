@@ -25,6 +25,10 @@ function identity(ctx) {
 function validateId(docId) {
   if (typeof docId !== "string" || !idPattern.test(docId)) fail("VALIDATION", "Invalid document ID");
 }
+function statusAt(record, now) {
+  if (record.revoked === true) return 'REVOKED';
+  return record.metadata?.expiresAt && record.metadata.expiresAt <= now ? 'EXPIRED' : 'ACTIVE';
+}
 class DocumentContract extends Contract {
   async initLedger() {}
   async ping() { return JSON.stringify({ status: "UP", schemaVersion: 2 }); }
@@ -39,6 +43,10 @@ class DocumentContract extends Contract {
     let metadata;
     try { metadata = JSON.parse(metadataJson); } catch { fail("VALIDATION", "Metadata must be JSON"); }
     if (!metadata || Array.isArray(metadata) || typeof metadata !== "object") fail("VALIDATION", "Metadata must be an object");
+    if (Object.hasOwn(metadata, 'expiresAt') && (typeof metadata.expiresAt !== 'string'
+        || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(metadata.expiresAt)
+        || !Number.isFinite(Date.parse(metadata.expiresAt)) || new Date(metadata.expiresAt).toISOString() !== metadata.expiresAt))
+      fail('VALIDATION', 'Expiry must be a valid UTC timestamp with milliseconds');
     if (await this.documentExists(ctx, docId)) fail("DUPLICATE", "Document already exists");
     const now = getTxISOString(ctx);
     const document = { docType: "document", schemaVersion: 2, docId, hash,
@@ -60,8 +68,9 @@ class DocumentContract extends Contract {
     const document = JSON.parse(await this.getDocument(ctx, docId));
     const matches = document.hash === hash;
     const revoked = document.revoked === true;
-    return JSON.stringify({ docId, matches, revoked, revocationReason: document.revocationReason || "",
-      valid: matches && !revoked, status: revoked ? "REVOKED" : matches ? "VALID" : "TAMPERED_OR_MISMATCH" });
+    const expired = !!document.metadata?.expiresAt && document.metadata.expiresAt <= getTxISOString(ctx);
+    return JSON.stringify({ docId, matches, revoked, expired, revocationReason: document.revocationReason || "",
+      valid: matches && !revoked && !expired, status: revoked ? "REVOKED" : expired ? "EXPIRED" : matches ? "VALID" : "TAMPERED_OR_MISMATCH" });
   }
   async revokeDocument(ctx, docId, reason) {
     const caller = identity(ctx);
@@ -81,10 +90,11 @@ class DocumentContract extends Contract {
   }
   async searchDocuments(ctx, prefix, status, owner, after) {
     const caller = identity(ctx);
-    if (!/^[A-Z0-9-]{0,50}$/.test(prefix) || !['ALL', 'ACTIVE', 'REVOKED'].includes(status)
+    if (!/^[A-Z0-9-]{0,50}$/.test(prefix) || !['ALL', 'ACTIVE', 'REVOKED', 'EXPIRED'].includes(status)
         || (owner && !hashPattern.test(owner)) || !text(after, 512)) fail('VALIDATION', 'Invalid search');
     if (after && prefix && !after.startsWith(prefix)) fail('VALIDATION', 'Cursor does not match prefix');
     const iterator = await ctx.stub.getStateByRange(after ? after + '\u0000' : prefix, prefix ? prefix + '~' : '');
+    const now = getTxISOString(ctx);
     const items = []; let scanned = 0, last = '', more = false;
     try {
       while (scanned < 250 && items.length < 20) {
@@ -94,12 +104,38 @@ class DocumentContract extends Contract {
         const record = JSON.parse(next.value.value.toString('utf8'));
         if (record.docType === 'document' && record.issuer === caller.department && record.issuerMspId === caller.msp
             && (!owner || record.metadata?.ownerSubjectHash === owner)
-            && (status === 'ALL' || (record.revoked === true) === (status === 'REVOKED'))) items.push(record);
+            && (status === 'ALL' || statusAt(record, now) === status)) items.push({...record, effectiveStatus: statusAt(record, now)});
         if (next.done) break;
       }
       if (scanned === 250 || items.length === 20) more = !!(await iterator.next()).value;
     } finally { await iterator.close(); }
     return JSON.stringify({ items, nextAfter: more ? last : '' });
+  }
+  async documentSummary(ctx, owner) {
+    const caller = identity(ctx);
+    if (owner && !hashPattern.test(owner)) fail('VALIDATION', 'Invalid owner');
+    const asOf = getTxISOString(ctx), counts = {total: 0, active: 0, expired: 0, revoked: 0}, recent = [];
+    const iterator = await ctx.stub.getStateByRange('', '');
+    let scanned = 0, complete = true;
+    try {
+      while (scanned < 5000) {
+        const next = await iterator.next();
+        if (!next.value) break;
+        scanned++;
+        const record = JSON.parse(next.value.value.toString('utf8'));
+        if (record.docType === 'document' && record.issuer === caller.department && record.issuerMspId === caller.msp
+            && (!owner || record.metadata?.ownerSubjectHash === owner)) {
+          const effectiveStatus = statusAt(record, asOf);
+          counts.total++; counts[effectiveStatus.toLowerCase()]++;
+          recent.push({...record, effectiveStatus});
+          recent.sort((a,b) => (b.updatedAt || '').localeCompare(a.updatedAt || '') || a.docId.localeCompare(b.docId));
+          recent.splice(5);
+        }
+        if (next.done) break;
+      }
+      if (scanned === 5000) complete = !(await iterator.next()).value;
+    } finally { await iterator.close(); }
+    return JSON.stringify({counts, recent, complete, asOf});
   }
   async getDocumentHistory(ctx, docId) {
     await this.getDocument(ctx, docId);

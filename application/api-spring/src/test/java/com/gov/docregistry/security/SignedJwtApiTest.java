@@ -57,6 +57,20 @@ class SignedJwtApiTest {
     p.add("registry.encryption.keys-file", () -> keys.toString());
   }
 
+  @Test
+  void summaryDerivesOwnerAndChecksRecentRecords() throws Exception {
+    var result = new ObjectMapper().createObjectNode(); result.putArray("recent"); result.putObject("counts").put("total", 0);
+    String owner = DocumentAccess.ownerHash("https://identity.example", "opaque-citizen-or-staff-id");
+    when(ledger.summary(owner)).thenReturn(result);
+    mvc.perform(get("/api/documents/summary").with(https()).header("Authorization", "Bearer " + valid(List.of("CITIZEN"))))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.counts.total").value(0));
+    verify(ledger).summary(owner);
+    result.withArray("recent").addObject().put("docId", "FOREIGN").put("issuer", "Other");
+    mvc.perform(get("/api/documents/summary").with(https()).header("Authorization", "Bearer " + valid(List.of("CITIZEN"))))
+        .andExpect(status().isNotFound());
+    mvc.perform(get("/api/documents/summary").with(https())).andExpect(status().isUnauthorized());
+  }
+
   @TestBean(enforceOverride = true)
   JwtDecoder jwtDecoder;
 

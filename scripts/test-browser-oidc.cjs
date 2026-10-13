@@ -41,6 +41,7 @@ function api(url,method='GET',data=null,token=null,type='application/json'){
   await page.locator('#logout').click();await page.locator('#connection').waitFor({state:'visible'});
   stage='citizen code flow';await login('citizen');
   assert.match(await page.locator('#roles').textContent(),/CITIZEN/);assert.equal(await page.locator('#issue-tab').isVisible(),false);
+  await page.locator('#summary-activity').filter({hasText:id}).waitFor();
   stage='owned dashboard search';await page.locator('#search-prefix').fill(id);await page.locator('#search button').click();await page.locator('#search-results').filter({hasText:id}).waitFor();
   await page.locator('#search-results button').click();await page.locator('#record-id').filter({hasText:id}).waitFor();assert.equal(await page.locator('#history').isVisible(),false);
   stage='citizen exact download and verification';
@@ -54,6 +55,8 @@ function api(url,method='GET',data=null,token=null,type='application/json'){
   assert.equal(await page.locator('#workspace').isVisible(),true);
   await page.locator('#dashboard-tab').click();await page.locator('#search-prefix').fill(id);await page.locator('#search button').click();await page.locator('#search-results').filter({hasText:'No accessible documents'}).waitFor();
   assert.equal(await page.locator('#record').isVisible(),false);
+  await page.locator('#summary-note').filter({hasText:'All accessible records'}).waitFor();
+  assert.equal((await page.locator('#summary-activity').textContent()).includes(id),false);
   const stored=await page.evaluate(()=>Object.values(localStorage).concat(Object.values(sessionStorage)));
   assert.ok(stored.every(value=>!value.includes('access_token')&&!value.includes('refresh_token')));
   await page.locator('#logout').click();

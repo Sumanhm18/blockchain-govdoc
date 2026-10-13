@@ -33,7 +33,7 @@ The interface supports individual-ID operations and access-controlled document b
 
 ## Documents dashboard and history
 
-Readers and citizens can browse records through **Documents**, filter by ID prefix or active/revoked state, and open a result. The server derives citizen ownership from the validated token, not a browser field. Chaincode filters against the service department/MSP and owner hash, and the API checks each result again.
+Readers and citizens can browse records through **Documents**, filter by ID prefix or active/revoked/expired state, and open a result. The server derives citizen ownership from the validated token, not a browser field. Chaincode filters against the service department/MSP and owner hash, and the API checks each result again.
 
 Each page returns up to 20 records after scanning at most 250 ledger entries. A page may be empty but still offer **Next page**. Results use document-ID order, not a global newest-first index. Encrypted, authenticated cursors expire after 15 minutes and are bound to the query, status and citizen ownership scope. Restarting the API preserves cursors while the encryption key remains available. The **Recently opened** section keeps up to six IDs in page memory and clears on sign-out.
 
@@ -72,3 +72,13 @@ The reference is an account identifier, not a password or independent proof of i
 On macOS, double-click `Open GovDoc.command` in the repository folder. Choose **1** for department development accounts or **2** for HTTPS citizen/issuer sign-in. Docker must be running. The citizen choice checks ownership of all eleven prepared containers before starting any stopped service, then checks both the identity provider and API. It opens the isolated Chrome profile with the existing local certificate pins. It does not generate passwords, rebuild images or reset data.
 
 From a terminal use `python3 scripts/start-project.py` or `python3 scripts/start-project.py --citizen`. Add `--no-open` to resume/check services without opening a browser. Initial setup remains `./deploy.sh` and, for citizen mode, `./scripts/staging.sh up`; this launcher requires the prepared containers.
+
+### Expiry, overview and batch verification
+
+Issuers can set **Expires at** in their local time; the browser converts it to UTC before registration. Leave it blank for no expiry. Expired documents show **EXPIRED**, cannot be downloaded, and never verify as valid. They remain searchable and their history remains intact. Revocation takes precedence when both apply.
+
+The dashboard shows total, active, expired and revoked counts for accessible documents and the five most recent issuance/revocation updates. **Refresh overview** recomputes the view. Search filters do not affect these totals. The server scans at most 5,000 entries; if more exist, the UI explicitly labels the overview partial. Counts are a snapshot and expiry does not create a new activity transaction.
+
+In **Batch verification**, select up to 20 files and confirm each document ID. Filename stems matching the ID format are suggested; edit them before starting. Each file is verified sequentially using actual bytes and current permissions. Results distinguish valid, modified, expired, revoked and request failures. **Cancel remaining** stops subsequent requests; the current request may finish, but its late response is not shown. Sign-out clears selected files and results. No results are persisted in browser storage.
+
+Run `node scripts/test-extra-features.cjs` against the prepared development stack for expiry, dashboard and mixed-batch checks.

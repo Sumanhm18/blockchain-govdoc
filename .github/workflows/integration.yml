@@ -23,7 +23,9 @@ jobs:
           npm ci --prefix application/web-assets --ignore-scripts
           ./application/web-assets/node_modules/.bin/playwright install --with-deps chromium
       - name: Browser document workflow
-        run: node scripts/test-web.cjs
+        run: |
+          node scripts/test-web.cjs
+          node scripts/test-extra-features.cjs
       - name: Synthetic API, Fabric and IPFS scenario
         run: ./test_demo.sh
       - name: Submission presentation walkthrough

@@ -6,7 +6,7 @@ This repository is a prototype, not a certified government service. Its Fabric s
 
 ## Submission and presentation
 
-Open the [local web interface](http://127.0.0.1:18081/) on a prepared running stack. It supports a searchable document dashboard, issuance, download, file verification, revocation, a history timeline and authenticated QR links. HTTPS staging adds citizen sign-in through Keycloak with PKCE. See [web interface instructions](docs/WEB_INTERFACE.md).
+Open the [local web interface](http://127.0.0.1:18081/) on a prepared running stack. It supports a searchable document dashboard, issuance, download, file verification, revocation, a history timeline, expiry enforcement, batch file verification, access-filtered dashboard totals and authenticated QR links. HTTPS staging adds citizen sign-in through Keycloak with PKCE. See [web interface instructions](docs/WEB_INTERFACE.md).
 
 Start with the [October 14 submission guide](docs/SUBMISSION.md) and [project report draft](docs/PROJECT_REPORT.md). On a prepared computer, run `python3 scripts/resume-demo.py`, then `./demo.sh --pause` for a live six-step walkthrough. The restart command reuses existing containers without downloads or rebuilds.
 
