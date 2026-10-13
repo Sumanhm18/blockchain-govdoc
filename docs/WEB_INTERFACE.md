@@ -66,3 +66,9 @@ Localhost QR links work only on the computer serving the app. Cross-device scann
 3. Sign out and return as the citizen. Find the document in **Documents**, download it and verify the file. Another citizen cannot read this record.
 
 The reference is an account identifier, not a password or independent proof of identity. It is displayed only for the currently authenticated citizen and cleared on sign-out. Leaving the assignment blank grants department access only. Development Basic accounts do not support citizen assignment; use the prepared HTTPS identity-provider flow.
+
+### Start the prepared project
+
+On macOS, double-click `Open GovDoc.command` in the repository folder. Choose **1** for department development accounts or **2** for HTTPS citizen/issuer sign-in. Docker must be running. The citizen choice checks ownership of all eleven prepared containers before starting any stopped service, then checks both the identity provider and API. It opens the isolated Chrome profile with the existing local certificate pins. It does not generate passwords, rebuild images or reset data.
+
+From a terminal use `python3 scripts/start-project.py` or `python3 scripts/start-project.py --citizen`. Add `--no-open` to resume/check services without opening a browser. Initial setup remains `./deploy.sh` and, for citizen mode, `./scripts/staging.sh up`; this launcher requires the prepared containers.

@@ -10,6 +10,8 @@ Open the [local web interface](http://127.0.0.1:18081/) on a prepared running st
 
 Start with the [October 14 submission guide](docs/SUBMISSION.md) and [project report draft](docs/PROJECT_REPORT.md). On a prepared computer, run `python3 scripts/resume-demo.py`, then `./demo.sh --pause` for a live six-step walkthrough. The restart command reuses existing containers without downloads or rebuilds.
 
+On this prepared Mac, double-click **Open GovDoc.command** and choose the department demo or citizen/issuer sign-in. Start Docker first. The launcher resumes existing services, checks readiness and opens the correct browser without rebuilding or resetting data. For terminal use: `python3 scripts/start-project.py --citizen` (omit `--citizen` for the department demo).
+
 ## Quick start
 
 Requirements: macOS or Linux, Docker with Compose, Git, Python 3.12+, and internet access. Node 20+ and Java 17+/Maven are needed only for host-side tests/development. Start Docker first. Run from this directory:
