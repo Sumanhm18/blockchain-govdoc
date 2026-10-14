@@ -1,13 +1,13 @@
 # Validation record
 
-Validated locally on 11–13 October 2026 using macOS arm64, Docker Desktop, a fresh isolated Fabric development network, IPFS and synthetic documents only. No external government deployment was tested.
+Validated locally on 11–14 October 2026 using macOS arm64, Docker Desktop, a fresh isolated Fabric development network, IPFS and synthetic documents only. No external government deployment was tested.
 
 ## Automated suites
 
 | Check | Result / coverage |
 |---|---|
-| Java Maven suite | 48 tests pass on Spring Boot 4.1.1, Jackson 3.1.7 and Tomcat 11.0.26: signed JWT validation, authenticated citizen assignment references, citizen ownership and department isolation, protected metrics, HTTP authentication/roles/validation/errors, JWT claim validation, account/IP limits, structured IPFS responses/failures/limits, encryption and tampering, durable recovery, duplicate handling, revoked download and Gateway dependency compatibility |
-| Node contract suite | 21 tests pass: registration, issuer attributes, cross-department/MSP denial, duplicates, missing IDs, validation, matching/mismatching/revoked outcomes, deterministic metadata, post-2038 timestamps, history and Fabric dispatcher argument count |
+| Java Maven suite | 50 tests pass on Spring Boot 4.1.1, Jackson 3.1.7 and Tomcat 11.0.26: signed JWT validation, authenticated citizen assignment references, citizen ownership and department isolation, protected metrics, HTTP authentication/roles/validation/errors, JWT claim validation, account/IP limits, structured IPFS responses/failures/limits, encryption and tampering, durable recovery, duplicate handling, revoked download and Gateway dependency compatibility |
+| Node contract suite | 23 tests pass: registration, issuer attributes, cross-department/MSP denial, duplicates, missing IDs, validation, matching/mismatching/revoked outcomes, deterministic metadata, post-2038 timestamps, history and Fabric dispatcher argument count |
 | Live API/IPFS/Fabric | 16 checks pass: authenticated upload, encrypted IPFS bytes, verified plaintext download, hash/file verification, revocation, duplicates, missing records and history |
 | Direct Fabric authorization | 2 checks pass: unattributed identity and department impersonation rejected without relying on HTTP security |
 | Live outage/restart recovery | Pass: IPFS failure, durable staging, API restart, automatic recovery, exact download and no duplicate registration |
@@ -61,3 +61,7 @@ Citizen assignment is exercised through the real browser flow: citizen retrieves
 The prepared-project launcher validates container ownership before starting any service. Three regression tests cover ownership mismatch, the eleven-service citizen selection and already-running department mode. A live stop/resume rehearsal of the three citizen services passed both identity-provider and API readiness checks.
 
 Expiry, batch verification and overview validation: exact expiry boundary, revocation precedence, invalid expiry rejection, expiry-bound retry fingerprints, download denial before storage reads, owned summary counts and bounded incomplete scans pass in backend/chaincode tests. Live browser checks cover expiry issuance, active/expired/revoked totals, expired search, mixed five-file results, logout clearing and mobile layout. A separate intercepted response checks cancellation without sending the next file. Real citizen browser checks also ensure recent updates exclude another citizen’s document.
+
+Verification receipts and expiry alerts: 7/30-day boundary, private alert filtering, earliest-ten limits, receipt authentication and department/citizen denial tests pass. Browser tests confirm fresh PDF results after revocation, expired receipts, citizen receipts and clearing receipt availability when the selected file changes. A generated one-page receipt was independently parsed and visually inspected. Receipts contain no source document bytes or credentials and are explicitly unsigned snapshots.
+
+Final layout regression: maximum-length document IDs fit both the mobile dashboard and PDF receipt. The final browser feature suite and 16 live API plus two direct Fabric checks passed after the wrapping fix.

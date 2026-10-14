@@ -82,3 +82,9 @@ The dashboard shows total, active, expired and revoked counts for accessible doc
 In **Batch verification**, select up to 20 files and confirm each document ID. Filename stems matching the ID format are suggested; edit them before starting. Each file is verified sequentially using actual bytes and current permissions. Results distinguish valid, modified, expired, revoked and request failures. **Cancel remaining** stops subsequent requests; the current request may finish, but its late response is not shown. Sign-out clears selected files and results. No results are persisted in browser storage.
 
 Run `node scripts/test-extra-features.cjs` against the prepared development stack for expiry, dashboard and mixed-batch checks.
+
+### Verification receipts and expiry alerts
+
+After verifying a file under **Find & verify**, choose **Download verification receipt (PDF)**. The app resubmits that selected file for a fresh authorized verification, then downloads a one-page receipt showing the document ID, current result, completion time, submitted digest, revocation and expiry flags. If validity changed after the on-screen check, the PDF shows the new result. Changing the selected file, changing records or signing out clears receipt availability. The receipt is a snapshot, not a digitally signed certificate.
+
+The dashboard’s **Expiring soon** section offers **Within 7 days** and **Within 30 days**. It shows accessible active documents and their UTC expiry times, with the earliest ten listed. Seven-day counts are included in the 30-day total. Already expired or revoked documents are excluded. Refresh the overview to recompute alerts; partial scans are explicitly labelled. No emails, background reminders or notifications are sent.

@@ -244,6 +244,9 @@ class SignedJwtApiTest {
         .andExpect(status().isNotFound());
     mvc.perform(get("/api/documents/DOC-001/history").with(https()).header("Authorization", auth))
         .andExpect(status().isForbidden());
+    mvc.perform(multipart("/api/documents/DOC-002/verification-receipt")
+        .file(new org.springframework.mock.web.MockMultipartFile("file", new byte[]{1})).with(https()).header("Authorization", auth))
+        .andExpect(status().isNotFound());
     verifyNoInteractions(ipfs);
   }
 

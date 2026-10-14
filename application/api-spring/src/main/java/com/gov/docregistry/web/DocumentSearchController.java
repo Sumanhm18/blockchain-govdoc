@@ -27,6 +27,7 @@ public class DocumentSearchController {
   public tools.jackson.databind.JsonNode summary() {
     var result = ledger.summary(access.searchOwner());
     for (var record : result.path("recent")) access.requireRead(record);
+    for (var record : result.path("alerts").path("items")) access.requireRead(record);
     return result;
   }
   @GetMapping("/api/documents")

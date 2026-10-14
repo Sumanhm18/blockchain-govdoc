@@ -195,7 +195,11 @@ public class DocumentService {
   }
 
   public JsonNode verifyFile(String id, MultipartFile file) {
-    return ledger.verify(id, DocumentCrypto.hash(bytes(file)));
+    String hash = DocumentCrypto.hash(bytes(file));
+    ObjectNode result = (ObjectNode) ledger.verify(id, hash).deepCopy();
+    result.put("providedHash", hash);
+    result.put("checkedAt", java.time.Instant.now().toString());
+    return result;
   }
 
   public record Download(byte[] bytes, String mediaType) {}

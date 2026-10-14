@@ -77,6 +77,18 @@ public class DocumentController {
     return documents.verifyFile(docId, file);
   }
 
+  @PostMapping(value = "/{docId}/verification-receipt", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_PDF_VALUE)
+  @PreAuthorize("hasAnyRole('READER','CITIZEN')")
+  public ResponseEntity<byte[]> receipt(@PathVariable @Pattern(regexp = Requests.ID) String docId,
+      @RequestPart("file") MultipartFile file) {
+    access.requireRead(ledger.get(docId));
+    JsonNode result = documents.verifyFile(docId, file);
+    return ResponseEntity.ok().contentType(MediaType.APPLICATION_PDF)
+        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + docId + "-verification.pdf\"")
+        .header(HttpHeaders.CACHE_CONTROL, "no-store")
+        .body(VerificationReceipt.create(docId, result));
+  }
+
   @PostMapping(value = "/{docId}/revoke", consumes = MediaType.APPLICATION_JSON_VALUE)
   @PreAuthorize("hasRole('REVOKER')")
   public JsonNode revoke(

@@ -13,6 +13,7 @@ Base URL in development: `http://127.0.0.1:18081`. All document/session operatio
 | GET `/api/documents/{id}` | READER or owning CITIZEN | Document record |
 | POST `/api/documents/{id}/verify` | READER or owning CITIZEN | JSON `{ "hash": "sha256:<64 lowercase hex>" }` |
 | POST `/api/documents/{id}/verify-file` | READER or owning CITIZEN | multipart `file`; digest computed by API |
+| POST `/api/documents/{id}/verification-receipt` | READER or owning CITIZEN | multipart `file`; freshly verifies bytes and downloads a one-page PDF snapshot with no-store caching |
 | POST `/api/documents/{id}/revoke` | REVOKER | JSON `{ "reason": "nonempty reason" }` |
 | GET `/api/documents/{id}/file` | READER or owning CITIZEN | Decrypted verified attachment; revoked or expired records rejected |
 | GET `/api/documents/{id}/history` | READER | `{docId, events, truncated}` |
@@ -56,3 +57,7 @@ Citizen access requires an issuer-assigned `ownerSubject` at registration/upload
 Optional expiry uses `metadata.expiresAt` in ledger records. Metadata registration accepts it in `metadataJson`; multipart upload accepts `expiresAt`. It must be a valid UTC timestamp with milliseconds, for example `2027-10-14T12:00:00.000Z`. Omission means no expiry; past timestamps produce an already expired record. Validity ends at the exact timestamp. Verification uses the Fabric proposal timestamp; download uses API UTC time. Expiry does not write a revocation transaction. GET records and search results include `effectiveStatus`. The ledger must be upgraded to the current chaincode before using these features.
 
 Summary totals are a point-in-time view across all accessible documents, independent of search filters. If `complete:false`, both counts and recent records cover only the scanned subset and must not be displayed as complete totals. Batch verification in the browser sends sequential existing `verify-file` requests (up to 20 selected files); it does not bypass per-file access checks or raise upload limits.
+
+File-verification responses also return `providedHash` (SHA-256 calculated from the submitted bytes) and `checkedAt` (UTC completion time). PDF receipts use a new verification call, so a later revocation is reflected even if an earlier UI result was valid. A receipt is not digitally signed, is not an official certificate and does not prove future validity. No source bytes, identity claims or credentials are included.
+
+Summary `alerts` includes cumulative `within7Days` and `within30Days` counts plus `items` (the earliest 10 expirations within 30 days). Only active, accessible records are counted; expiry at the exact window endpoint is included. Seven-day counts are a subset of 30-day counts. The summary’s `complete` and `asOf` fields apply to alerts too. These are on-demand dashboard alerts, not scheduled notifications.

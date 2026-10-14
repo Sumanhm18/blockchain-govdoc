@@ -115,6 +115,9 @@ class DocumentContract extends Contract {
     const caller = identity(ctx);
     if (owner && !hashPattern.test(owner)) fail('VALIDATION', 'Invalid owner');
     const asOf = getTxISOString(ctx), counts = {total: 0, active: 0, expired: 0, revoked: 0}, recent = [];
+    const alerts = {within7Days: 0, within30Days: 0, items: []};
+    const seven = new Date(Date.parse(asOf) + 7 * 86400000).toISOString();
+    const thirty = new Date(Date.parse(asOf) + 30 * 86400000).toISOString();
     const iterator = await ctx.stub.getStateByRange('', '');
     let scanned = 0, complete = true;
     try {
@@ -127,6 +130,14 @@ class DocumentContract extends Contract {
             && (!owner || record.metadata?.ownerSubjectHash === owner)) {
           const effectiveStatus = statusAt(record, asOf);
           counts.total++; counts[effectiveStatus.toLowerCase()]++;
+          const expiresAt = record.metadata?.expiresAt;
+          if (effectiveStatus === 'ACTIVE' && expiresAt && expiresAt <= thirty) {
+            alerts.within30Days++;
+            if (expiresAt <= seven) alerts.within7Days++;
+            alerts.items.push({...record, effectiveStatus});
+            alerts.items.sort((a,b) => a.metadata.expiresAt.localeCompare(b.metadata.expiresAt) || a.docId.localeCompare(b.docId));
+            alerts.items.splice(10);
+          }
           recent.push({...record, effectiveStatus});
           recent.sort((a,b) => (b.updatedAt || '').localeCompare(a.updatedAt || '') || a.docId.localeCompare(b.docId));
           recent.splice(5);
@@ -135,7 +146,7 @@ class DocumentContract extends Contract {
       }
       if (scanned === 5000) complete = !(await iterator.next()).value;
     } finally { await iterator.close(); }
-    return JSON.stringify({counts, recent, complete, asOf});
+    return JSON.stringify({counts, recent, alerts, complete, asOf});
   }
   async getDocumentHistory(ctx, docId) {
     await this.getDocument(ctx, docId);

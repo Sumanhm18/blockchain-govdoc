@@ -81,6 +81,41 @@ class DocumentApiTest {
   }
 
   @Test
+  void receiptVerifiesActualBytesAndReturnsPrivatePdfSnapshot() throws Exception {
+    byte[] source = "INTERNAL-SOURCE-CONTENT".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    String hash = com.gov.docregistry.storage.DocumentCrypto.hash(source);
+    when(ledger.verify("DOC-001", hash)).thenReturn(mapper.createObjectNode().put("status", "VALID").put("matches", true).put("revoked", false).put("expired", false));
+    var response = mvc.perform(multipart("/api/documents/DOC-001/verification-receipt")
+        .file(new MockMultipartFile("file", "source.txt", "text/plain", source))
+        .with(httpBasic("test-reader", "test-only-passphrase")))
+        .andExpect(status().isOk()).andExpect(content().contentType(MediaType.APPLICATION_PDF))
+        .andExpect(header().string("Cache-Control", "no-store"))
+        .andExpect(header().string("Content-Disposition", "attachment; filename=\"DOC-001-verification.pdf\""))
+        .andReturn().getResponse();
+    String pdf = response.getContentAsString(java.nio.charset.StandardCharsets.US_ASCII);
+    Assertions.assertTrue(pdf.startsWith("%PDF-1.4"));
+    Assertions.assertTrue(pdf.contains("(VALID)"));
+    Assertions.assertTrue(pdf.contains(hash.substring(0, 39)));
+    Assertions.assertTrue(pdf.contains(hash.substring(39)));
+    Assertions.assertFalse(pdf.contains("INTERNAL-SOURCE-CONTENT"));
+    verify(ledger).verify("DOC-001", hash);
+    when(ledger.verify("DOC-001", hash)).thenReturn(mapper.createObjectNode().put("status", "REVOKED").put("matches", true).put("revoked", true).put("expired", false));
+    mvc.perform(multipart("/api/documents/DOC-001/verification-receipt").file(new MockMultipartFile("file", source))
+        .with(httpBasic("test-reader", "test-only-passphrase")))
+        .andExpect(status().isOk()).andExpect(content().string(org.hamcrest.Matchers.containsString("(REVOKED)")));
+  }
+
+  @Test
+  void receiptRequiresAuthenticationAndDepartmentReadPermission() throws Exception {
+    mvc.perform(multipart("/api/documents/DOC-001/verification-receipt").file(new MockMultipartFile("file", new byte[]{1})))
+        .andExpect(status().isUnauthorized());
+    when(ledger.get("DOC-001")).thenReturn(mapper.createObjectNode().put("issuer", "Other").put("issuerMspId", "OtherMSP"));
+    mvc.perform(multipart("/api/documents/DOC-001/verification-receipt").file(new MockMultipartFile("file", new byte[]{1}))
+        .with(httpBasic("test-reader", "test-only-passphrase"))).andExpect(status().isNotFound());
+    verify(ledger, never()).verify(anyString(), anyString());
+  }
+
+  @Test
   void publicInterfaceDoesNotExposeAuthenticatedSession() throws Exception {
     mvc.perform(get("/index.html"))
         .andExpect(status().isOk())

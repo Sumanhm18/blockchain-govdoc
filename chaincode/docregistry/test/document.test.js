@@ -164,3 +164,21 @@ test('summary labels capped scans incomplete and closes iterator',async()=>{
   ctx.stub.getStateByRange=async()=>({next:async()=>({value:{key:String(++reads),value:Buffer.from('{"docType":"document","issuer":"Other"}')}}),close:async()=>{closed=true;}});
   const result=JSON.parse(await c.documentSummary(ctx,''));assert.equal(result.complete,false);assert.equal(result.counts.total,0);assert.equal(reads,5001);assert.equal(closed,true);
 });
+
+test('expiry alerts include exact 7/30 day boundaries and exclude hidden, expired or revoked records',async()=>{
+  const c=new Contract(),ctx=context();range(ctx);
+  const now=1700000000000, expiry=days=>new Date(now+days*86400000).toISOString();
+  for(const [id,days] of [['ALERT-7',7],['ALERT-30',30],['ALERT-LATER',31],['ALERT-PAST',0],['ALERT-REVOKED',2]])
+    await issue(c,ctx,id,JSON.stringify({expiresAt:expiry(days),ownerSubjectHash:HASH}));
+  await c.revokeDocument(ctx,'ALERT-REVOKED','synthetic');
+  await issue(c,ctx,'ALERT-OTHER',JSON.stringify({expiresAt:expiry(1),ownerSubjectHash:'sha256:'+'b'.repeat(64)}));
+  await issue(c,ctx,'ALERT-FOREIGN',JSON.stringify({expiresAt:expiry(1),ownerSubjectHash:HASH}));
+  const foreign=JSON.parse(ctx.state.get('ALERT-FOREIGN'));foreign.issuerMspId='OtherMSP';ctx.state.set('ALERT-FOREIGN',Buffer.from(JSON.stringify(foreign)));
+  const {alerts}=JSON.parse(await c.documentSummary(ctx,HASH));
+  assert.equal(alerts.within7Days,1);assert.equal(alerts.within30Days,2);assert.deepEqual(alerts.items.map(x=>x.docId),['ALERT-7','ALERT-30']);
+});
+test('expiry alert list is capped at ten earliest records while counts remain exact for completed scans',async()=>{
+  const c=new Contract(),ctx=context();range(ctx);
+  for(let day=15;day>0;day--)await issue(c,ctx,'ALERT-'+String(day).padStart(2,'0'),JSON.stringify({expiresAt:new Date(1700000000000+day*86400000).toISOString()}));
+  const {alerts,complete}=JSON.parse(await c.documentSummary(ctx,''));assert.equal(complete,true);assert.equal(alerts.within7Days,7);assert.equal(alerts.within30Days,15);assert.equal(alerts.items.length,10);assert.equal(alerts.items[0].docId,'ALERT-01');assert.equal(alerts.items[9].docId,'ALERT-10');
+});

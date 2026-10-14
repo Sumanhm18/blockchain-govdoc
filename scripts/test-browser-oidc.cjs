@@ -49,6 +49,9 @@ function api(url,method='GET',data=null,token=null,type='application/json'){
   const downloaded=await downloading;assert.deepEqual(fs.readFileSync(await downloaded.path()),file.buffer);
   await page.locator('#verify-file').setInputFiles(file);await page.locator('#verify button').click();
   await page.locator('#verification').filter({hasText:'VALID'}).waitFor();
+  stage='citizen verification receipt';
+  const receiptDownload=page.waitForEvent('download');await page.locator('#receipt button').click();
+  assert.ok(fs.readFileSync(await (await receiptDownload).path()).toString('ascii').includes('(VALID)'));
   stage='QR link preserves access';await page.locator('#share').click();assert.equal(await page.locator('#share-link').inputValue(),'https://localhost:18444/#document='+id);
   stage='provider logout';await page.locator('#logout').click();await page.waitForURL('https://localhost:18444/**');await page.locator('#connection').waitFor({state:'visible'});
   stage='other citizen QR sign-in';await login('other-citizen',id);await page.locator('#notice').filter({hasText:'404'}).waitFor();

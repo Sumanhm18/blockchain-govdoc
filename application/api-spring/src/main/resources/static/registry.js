@@ -5,6 +5,7 @@
   const active = new Set();
   let identitySession = false, searchVersion = 0, nextCursor = '';
   const recent = [];
+  let verifiedFile = null, alertSummary = null;
   let summaryVersion = 0, batchVersion = 0, batchRows = [];
   const effectiveStatus = record => record.effectiveStatus || (record.revoked ? 'REVOKED' : record.metadata?.expiresAt && Date.parse(record.metadata.expiresAt) <= Date.now() ? 'EXPIRED' : 'ACTIVE');
   function recordFromLink() { return /^#document=([A-Z0-9-]{3,50})$/.exec(location.hash)?.[1] || ''; }
@@ -56,6 +57,7 @@
     });
   }
   function clearRecord() {
+    verifiedFile = null; $('receipt').hidden = true;
     recordVersion++; currentId = ''; $('record').hidden = true; $('record-details').replaceChildren();
     $('verification').hidden = true; $('history-section').hidden = true; $('history-result').textContent = '';
     $('verify').reset(); $('revoke').reset(); $('share-section').hidden = true; $('share-link').value = '';
@@ -67,6 +69,7 @@
     $('recent-documents').replaceChildren(); $('search-results').replaceChildren(); $('search-more').hidden = true;
     summaryVersion++; batchVersion++; batchRows = []; $('batch-rows').replaceChildren(); $('batch-progress').textContent = ''; $('batch-cancel').disabled = true;
     $('summary-counts').replaceChildren(); $('summary-activity').replaceChildren(); $('summary-note').textContent = '';
+    alertSummary = null; $('expiry-alerts').replaceChildren(); $('expiry-alert-note').textContent = '';
     stopTracking(); confirmedId = ''; generation++; active.forEach(c => c.abort()); authorization = ''; roles = []; clearRecord();
     document.querySelectorAll('form').forEach(f => f.reset());
     $('workspace').hidden = true; $('connection').hidden = false; $('notice').hidden = true;
@@ -146,11 +149,13 @@
   async function refreshSummary() {
     const version = ++summaryVersion, ticket = generation;
     $('summary-note').textContent = 'Loading overview…';
+    alertSummary = null; $('expiry-alerts').replaceChildren(); $('expiry-alert-note').textContent = '';
     $('summary-counts').replaceChildren(); $('summary-activity').replaceChildren();
     try {
       const summary = await (await request('/api/documents/summary')).json();
       if (version !== summaryVersion || ticket !== generation) return;
       $('summary-note').textContent = `${summary.complete ? 'All accessible records' : 'Partial overview: scan limit reached; totals and recent updates cover only the scanned records'}. Checked ${summary.asOf}. Refresh to update expiry status.`;
+      alertSummary = summary; renderExpiryAlerts();
       for (const key of ['total','active','expired','revoked']) {
         const group = document.createElement('div'), label = document.createElement('dt'), value = document.createElement('dd');
         label.textContent = key[0].toUpperCase()+key.slice(1); value.textContent = summary.counts[key]; group.append(label,value); $('summary-counts').append(group);
@@ -165,6 +170,23 @@
       if (!summary.recent.length) $('summary-activity').textContent = 'No accessible document updates.';
     } catch (error) { if (version === summaryVersion && ticket === generation) $('summary-note').textContent = 'Overview unavailable. Use document search or refresh to retry.'; }
   }
+  function renderExpiryAlerts() {
+    $('expiry-alerts').replaceChildren();
+    if (!alertSummary) return;
+    const days = Number($('expiry-window').value), alerts = alertSummary.alerts;
+    if (!alerts) { $('expiry-alert-note').textContent = 'Expiry alerts unavailable. Refresh the overview.'; return; }
+    const end = Date.parse(alertSummary.asOf) + days * 86400000;
+    const items = alerts.items.filter(record => Date.parse(record.metadata.expiresAt) <= end);
+    const count = days === 7 ? alerts.within7Days : alerts.within30Days;
+    $('expiry-alert-note').textContent = `${alertSummary.complete ? '' : 'Partial scan: '}${count} accessible active document(s) expire within ${days} days. Showing ${items.length}${count > items.length ? ' earliest' : ''}. Refresh overview to update.`;
+    for (const record of items) {
+      const row = document.createElement('div'), label = document.createElement('span'), button = document.createElement('button'); row.className = 'document-row';
+      label.textContent = `${record.docId} · Expires ${record.metadata.expiresAt}`;
+      button.textContent = 'Open'; button.className = 'secondary'; button.addEventListener('click', () => openRecord(record.docId));
+      row.append(label,button); $('expiry-alerts').append(row);
+    }
+  }
+  $('expiry-window').addEventListener('change', renderExpiryAlerts);
   bind('refresh-summary', refreshSummary);
   $('batch-files').addEventListener('change', () => {
     batchVersion++; batchRows = []; $('batch-rows').replaceChildren(); $('batch-progress').textContent = '';
@@ -242,13 +264,28 @@
   bind('find', () => loadRecord($('lookup-id').value));
   bind('verify', async () => {
     const id = currentId, version = recordVersion;
+    verifiedFile = null; $('receipt').hidden = true;
     $('verification').hidden = true; const file = $('verify-file').files[0]; fileCheck(file);
     const data = new FormData(); data.append('file', file);
     const result = await (await request(`/api/documents/${encodeURIComponent(id)}/verify-file`, { method: 'POST', body: data })).json();
-    if (version !== recordVersion) return;
+    if (version !== recordVersion || $('verify-file').files[0] !== file) return;
     const descriptions = { VALID: 'VALID — File bytes match the registered digest and the document is not revoked.', TAMPERED_OR_MISMATCH: 'TAMPERED_OR_MISMATCH — File bytes differ from the registered digest.', EXPIRED: 'EXPIRED — The document has reached its expiry time.', REVOKED: 'REVOKED — The issuer has revoked this document.' };
     if (!(result.status in descriptions)) throw new Error('Unexpected verification response. Validity could not be established.');
     show('verification', descriptions[result.status], result.status === 'VALID' ? '' : 'error');
+    verifiedFile = file; $('receipt').hidden = false;
+  });
+  $('verify-file').addEventListener('change', () => { verifiedFile = null; $('receipt').hidden = true; $('verification').hidden = true; });
+  bind('receipt', async () => {
+    const id = currentId, version = recordVersion, file = verifiedFile;
+    if (!file) throw new Error('Verify a file before requesting its receipt.');
+    const data = new FormData(); data.append('file', file);
+    const response = await request(`/api/documents/${encodeURIComponent(id)}/verification-receipt`, {method:'POST',body:data});
+    const blob = await response.blob();
+    if (version !== recordVersion || file !== verifiedFile) return;
+    if (!response.headers.get('Content-Type')?.startsWith('application/pdf')) throw new Error('Receipt could not be generated.');
+    const url = URL.createObjectURL(blob), anchor = document.createElement('a');
+    anchor.href = url; anchor.download = id+'-verification.pdf'; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    show('notice', 'Receipt downloaded after a fresh verification. Its result may differ from the earlier check shown above.');
   });
   bind('revoke', async () => {
     const id = currentId;
