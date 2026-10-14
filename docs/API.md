@@ -1,0 +1,63 @@
+# HTTP API
+
+Base URL in development: `http://127.0.0.1:18081`. All document/session operations require authentication; `/api/client-config` is public. Development uses generated HTTP Basic accounts over loopback. Production profile requires HTTPS and an external JWT issuer. Roles are explicit; an issuer account is not implicitly a reader or revoker unless it has those roles.
+
+| Method and path | Role | Input / result |
+|---|---|---|
+| GET `/api/client-config` | Public | Nonsecret identity mode, issuer and public browser client ID |
+| GET `/api/documents` | READER or CITIZEN | Optional `prefix`, `status=ALL/ACTIVE/REVOKED/EXPIRED`, encrypted `cursor`; accessible `items` and `nextCursor` |
+| GET `/api/documents/summary` | READER or CITIZEN | Access-filtered `counts`, five recent records, `complete`, and `asOf`; bounded to 5,000 scanned ledger entries |
+| GET `/api/session` | Any authenticated account | Granted role names; JWT citizens also receive their own `citizenReference` for assignment by an issuer |
+| POST `/api/documents` | ISSUER | JSON metadata registration; no file storage |
+| POST `/api/documents/upload` | ISSUER | multipart `file`, `docId`; optional `issuer`, `subject`, `type`, `ownerSubject`, `expiresAt` |
+| GET `/api/documents/{id}` | READER or owning CITIZEN | Document record |
+| POST `/api/documents/{id}/verify` | READER or owning CITIZEN | JSON `{ "hash": "sha256:<64 lowercase hex>" }` |
+| POST `/api/documents/{id}/verify-file` | READER or owning CITIZEN | multipart `file`; digest computed by API |
+| POST `/api/documents/{id}/verification-receipt` | READER or owning CITIZEN | multipart `file`; freshly verifies bytes and downloads a one-page PDF snapshot with no-store caching |
+| POST `/api/documents/{id}/revoke` | REVOKER | JSON `{ "reason": "nonempty reason" }` |
+| GET `/api/documents/{id}/file` | READER or owning CITIZEN | Decrypted verified attachment; revoked or expired records rejected |
+| GET `/api/documents/{id}/history` | READER | `{docId, events, truncated}` |
+| GET `/api/documents/{id}/registration` | ISSUER | Local upload state, attempts, safe code and timestamp |
+| GET `/actuator/health/readiness` | Public | Real dependency readiness, no internal detail |
+| GET `/actuator/health/liveness` | Public | Application liveness |
+| GET `/actuator/metrics` | OPERATOR | Application metrics |
+
+Metadata registration retains the original request shape:
+
+```json
+{
+  "docId": "GOV-2026-001",
+  "hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "issuer": "Org1",
+  "subject": "opaque-reference",
+  "metadataJson": "{\"type\":\"certificate\"}"
+}
+```
+
+`issuer` may be omitted/empty and is derived from configured department. A conflicting issuer is forbidden. `metadataJson` must contain one JSON object, at most 16,384 characters; duplicate keys, trailing JSON and reserved upload fields (`registrationId`, `encryption`, `ipfsCid`) are rejected. Subject length is at most 128. Upload type length is at most 64; original filenames are ignored. Revoke reason length is 1–500 with nonblank content. Use nonsensitive references in all ledger metadata.
+
+Upload permits PDF, PNG or JPEG signatures and a 10 MiB maximum. Signature checks do not prove a file is valid, safe or malware-free. Verification accepts arbitrary nonempty file bytes up to the same limit. A supplied content-type does not override the upload signature check.
+
+Successful operations retain HTTP 200 and JSON object responses. Verification example:
+
+```json
+{"docId":"GOV-2026-001","matches":true,"revoked":false,"revocationReason":"","valid":true,"status":"VALID"}
+```
+
+Other verification statuses are `TAMPERED_OR_MISMATCH`, `EXPIRED` and `REVOKED`. A revoked or expired record has `valid:false` even when `matches:true`. Revocation takes precedence over expiry. Missing records produce 404 `NOT_FOUND`.
+
+Errors use `{ "code": "...", "message": "..." }` without raw dependency diagnostics. Typical statuses: 400 validation, 401 unauthenticated, 403 forbidden, 404 missing, 409 duplicate/revoked/expired/unsupported legacy storage, 413 file too large, 429 rate limited, 502 integrity failure and 503 dependency/capacity unavailable. Unsupported methods/media types preserve their HTTP status.
+
+HTTP **202** `REGISTRATION_PENDING` means the upload is durably staged, but confirmation is not yet established. Poll `/{id}/registration`, then fetch the document after `CONFIRMED`. States: `STAGING`, `PINNED`, `SUBMITTING`, `CONFIRMED`, `REJECTED`. Retry the same ID, file and fields to resume. Different content or metadata for the same ID is a conflict. Do not create a different ID merely because a request timed out.
+
+Compatibility changes are intentional security boundaries: authentication is required; issuer spoofing and unauthorized mutation are rejected; legacy identities without department attributes cannot write; a revocation reason is mandatory. The chaincode retains version-1 records, but REST read/verification requires recorded department and issuer MSP provenance; ambiguous legacy records and plaintext-storage downloads require reviewed migration. Invalid old IDs need a separately reviewed compatibility migration, not relaxed global validation.
+
+Citizen access requires an issuer-assigned `ownerSubject` at registration/upload; the API stores an issuer-scoped hash, checks the JWT subject and hides inaccessible records behind 404. See [the ownership policy](DEPLOYMENT_VALIDATION.md). Legacy records without a verified issuing MSP are denied by the departmental REST access policy even when chaincode can still query them.
+
+Optional expiry uses `metadata.expiresAt` in ledger records. Metadata registration accepts it in `metadataJson`; multipart upload accepts `expiresAt`. It must be a valid UTC timestamp with milliseconds, for example `2027-10-14T12:00:00.000Z`. Omission means no expiry; past timestamps produce an already expired record. Validity ends at the exact timestamp. Verification uses the Fabric proposal timestamp; download uses API UTC time. Expiry does not write a revocation transaction. GET records and search results include `effectiveStatus`. The ledger must be upgraded to the current chaincode before using these features.
+
+Summary totals are a point-in-time view across all accessible documents, independent of search filters. If `complete:false`, both counts and recent records cover only the scanned subset and must not be displayed as complete totals. Batch verification in the browser sends sequential existing `verify-file` requests (up to 20 selected files); it does not bypass per-file access checks or raise upload limits.
+
+File-verification responses also return `providedHash` (SHA-256 calculated from the submitted bytes) and `checkedAt` (UTC completion time). PDF receipts use a new verification call, so a later revocation is reflected even if an earlier UI result was valid. A receipt is not digitally signed, is not an official certificate and does not prove future validity. No source bytes, identity claims or credentials are included.
+
+Summary `alerts` includes cumulative `within7Days` and `within30Days` counts plus `items` (the earliest 10 expirations within 30 days). Only active, accessible records are counted; expiry at the exact window endpoint is included. Seven-day counts are a subset of 30-day counts. The summary’s `complete` and `asOf` fields apply to alerts too. These are on-demand dashboard alerts, not scheduled notifications.

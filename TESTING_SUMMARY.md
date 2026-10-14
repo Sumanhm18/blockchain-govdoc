@@ -1,224 +1,67 @@
-# Government Document Registry - Testing Summary
+# Validation record
 
-## Overview
-This document provides a comprehensive summary of the government document registry system built using Hyperledger Fabric, Spring Boot, and IPFS.
+Validated locally on 11–14 October 2026 using macOS arm64, Docker Desktop, a fresh isolated Fabric development network, IPFS and synthetic documents only. No external government deployment was tested.
 
-## System Architecture
+## Automated suites
 
-### 1. Hyperledger Fabric Network
-- **Network**: 2 organizations (Org1, Org2) with 1 peer each
-- **Channel**: `govchannel`
-- **Chaincode**: `docregistry` (JavaScript/Node.js)
-- **Consensus**: Raft ordering service
-- **TLS**: Enabled for production security
+| Check | Result / coverage |
+|---|---|
+| Java Maven suite | 50 tests pass on Spring Boot 4.1.1, Jackson 3.1.7 and Tomcat 11.0.26: signed JWT validation, authenticated citizen assignment references, citizen ownership and department isolation, protected metrics, HTTP authentication/roles/validation/errors, JWT claim validation, account/IP limits, structured IPFS responses/failures/limits, encryption and tampering, durable recovery, duplicate handling, revoked download and Gateway dependency compatibility |
+| Node contract suite | 23 tests pass: registration, issuer attributes, cross-department/MSP denial, duplicates, missing IDs, validation, matching/mismatching/revoked outcomes, deterministic metadata, post-2038 timestamps, history and Fabric dispatcher argument count |
+| Live API/IPFS/Fabric | 16 checks pass: authenticated upload, encrypted IPFS bytes, verified plaintext download, hash/file verification, revocation, duplicates, missing records and history |
+| Direct Fabric authorization | 2 checks pass: unattributed identity and department impersonation rejected without relying on HTTP security |
+| Live outage/restart recovery | Pass: IPFS failure, durable staging, API restart, automatic recovery, exact download and no duplicate registration |
+| Repeat deployment | Pass: rerunning `deploy.sh` preserves the existing development state and returns readiness |
+| Container build | Multi-stage build passes Maven tests on Java 17; API starts as a non-root user with read-only root filesystem and secret mounts |
+| Real HTTPS/OIDC staging | 37 checks pass against Keycloak, including token signature/discovery, citizen isolation, ownership retry conflicts and revocation; 20 concurrent-read smoke requests have zero failures |
+| Encrypted restore | Pass: encrypted snapshot, tamper rejection, checksums and exact download from an isolated restored API/IPFS instance |
+| Disposable certificate revocation | Pass: enrollment, CA revocation, signed channel MSP CRL update, revoked identity denial and existing service continuity |
+| Patched runtime deployment | Fabric 2.5.16 / CA 1.5.22; all six services and both chaincode containers use the patched image contents. IPFS runs as UID 1000; live checks pass |
+| Identity migration | Encrypted logical PostgreSQL 17 migration preserves identity/client/credential fingerprints; old volume retained; 37 OIDC checks pass after non-root PostgreSQL/Keycloak changes |
+| IPFS source rebuild | Go 1.26.9 build, locked module checksums and upstream repo/fsrepo + core/coreunix tests pass; isolated encrypted restore, 16 live API + 2 Fabric + 14 walkthrough + 37 OIDC checks and outage/restart recovery pass with the deployed image |
+| Fresh data volumes | IPFS initializes as UID 1000 and PostgreSQL as UID 70 without the old gosu helpers |
+| Full security gate | All nine targets scanned; no critical findings. API/Keycloak/PostgreSQL/Node runtime have no high/unknown findings. Fabric high/unknown findings and the IPFS/source x/crypto unknown finding correctly block release |
+| Main branch protection | Three required checks, strict branch updates and administrator enforcement enabled; force pushes/deletions disabled |
+| Required endorser outage | Pass: writes fail safely during outage and recover without duplicate registration; this is not HA failover |
+| Prepared demo restart | All eight owned services stopped and resumed without builds, pulls, key regeneration or data reset; 14-check walkthrough passes afterward |
+| Real browser identity flow | Keycloak authorization code + S256 PKCE, owned dashboard search, cross-citizen QR-link denial, callback cleanup and provider logout pass with fixture TLS public-key pins |
+| Browser interface | Live issuance/download/verification/revocation/history, reader controls, missing-record handling, safe metadata rendering, reload/sign-out and mobile layout, dashboard/status search, readable history and independently decoded QR pixels pass in Chromium; registration lookup after reload and the confirmed-record shortcut also pass; separate simulated responses cover automatic pending checks, expired sessions, request timeouts and stale-result behavior |
+| Presentation walkthrough | 14 checks pass; included in integration CI: role denial, actual-file digest, IPFS ciphertext, exact download, original/tampered verification, revocation and retained history |
+| npm audit | No advisories reported for the locked chaincode dependency graph at validation time |
+| Source hygiene | Private-key/generated-artifact pattern check and `git diff --check` pass |
 
-### 2. Chaincode Functions
-The `docregistry` chaincode implements the following functions:
+The API workflow passed both with a host-run Java process and the containerized API. Runtime validation found and fixed a Protobuf BOM conflict, peer TLS trust-root selection, isolated CA certificate path references, and JavaScript default-parameter arity that Fabric uses to construct transaction metadata. These issues demonstrate why mock-only tests were insufficient.
 
-#### `registerDocument(docId, hash, issuer, subject, metadataJson)`
-- Registers a new document in the blockchain
-- Validates document ID uniqueness
-- Stores document metadata and hash
-- Returns transaction timestamp
+## Recovery scenario
 
-#### `getDocument(docId)`
-- Retrieves document information by ID
-- Returns document details including hash, issuer, subject, metadata, and status
+`python3 scripts/test-recovery.py` requires the running `./deploy.sh` container stack. It checks project ownership before stopping only this project's IPFS container, uploads a synthetic PDF and expects durable HTTP 202/STAGING, restarts the API, restores IPFS in a finally block, then checks automatic confirmation, exact decrypted bytes, identical-request retry and a single registration history event. It revokes its synthetic record at the end. This scenario passed against the containerized stack.
 
-#### `verifyDocument(docId, hash)`
-- Verifies document integrity by comparing provided hash with stored hash
-- Returns verification result (true/false)
+Unit tests also cover the distinct uncertain-commit case: Fabric commits but the caller receives a dependency error; reopening the journal and observing the matching record confirms it without uploading or submitting again. That particular post-commit network fault is simulated in the unit suite, not injected into the live orderer connection.
 
-#### `revokeDocument(docId, reason)`
-- Revokes a document by marking it as revoked
-- Stores revocation reason and timestamp
-- Prevents further verification
+## Reproduce
 
-### 3. Spring Boot API
-- **Port**: 8081 (to avoid conflict with IPFS gateway on 8080)
-- **Framework**: Spring Boot 2.7.0
-- **Dependencies**: Fabric Gateway Java SDK, OkHttp for IPFS
-
-#### REST Endpoints
-
-##### `POST /api/documents`
-Register a new document
-```json
-{
-  "docId": "DOC-001",
-  "hash": "sha256:abc123...",
-  "issuer": "Ministry of Health",
-  "subject": "John Doe",
-  "metadataJson": "{\"type\":\"passport\",\"issueDate\":\"2024-01-01\"}"
-}
+```sh
+npm ci --prefix chaincode/docregistry
+npm test --prefix chaincode/docregistry
+mvn -B -f application/api-spring/pom.xml verify
+python3 scripts/check-secrets.py
+./deploy.sh
+./test_demo.sh
+python3 scripts/test-recovery.py
 ```
 
-##### `GET /api/documents/{docId}`
-Retrieve document information
-```json
-{
-  "docId": "DOC-001",
-  "hash": "sha256:abc123...",
-  "issuer": "Ministry of Health",
-  "subject": "John Doe",
-  "metadata": {"type":"passport","issueDate":"2024-01-01"},
-  "status": "active",
-  "registeredAt": "2024-01-01T10:00:00Z"
-}
-```
+CI definitions run source and development integration checks on pull requests, with manual integration dispatch also available. The draft PR is published, but GitHub rejected workflow startup because the account is locked by a billing issue; hosted CI has not executed. Runtime logs contain private CA/bootstrap material and are intentionally excluded from CI artifacts.
 
-##### `POST /api/documents/{docId}/verify`
-Verify document integrity
-```json
-{
-  "hash": "sha256:abc123..."
-}
-```
+## Not established by these tests
 
-##### `POST /api/documents/{docId}/revoke`
-Revoke a document
-```json
-{
-  "reason": "Document expired"
-}
-```
+Production readiness, live government identity integration, HSM/KMS integration, revocation on unidentified external deployments, highly available failover, multi-instance journal correctness, malicious-file detection, production load targets, legal compliance, vulnerability absence, penetration testing and full disaster recovery are not established. Read [Security scan](docs/SECURITY_SCAN.md) for residual Maven/container findings and coverage limits. History checks search limited private-key patterns; they cannot prove all sensitive data has been removed. Read [Security](docs/SECURITY.md) and [Operations](docs/OPERATIONS.md).
 
-##### `POST /api/documents/upload`
-Upload file to IPFS and register on blockchain
-- **Content-Type**: `multipart/form-data`
-- **Field**: `file` (the document file)
-- **Field**: `docId` (document identifier)
-- **Field**: `issuer` (issuing authority)
-- **Field**: `subject` (document subject)
+Citizen assignment is exercised through the real browser flow: citizen retrieves their own reference, issuer uploads a file for that reference, citizen downloads the exact original and verifies it, and another citizen is denied. Session API tests ensure anonymous callers cannot retrieve a reference and staff sessions do not include one.
 
-### 4. IPFS Integration
-- **Purpose**: Decentralized storage for actual document files
-- **API**: HTTP API on port 5001
-- **Storage**: Files stored with Content Identifiers (CIDs)
-- **Integration**: Spring Boot service uploads files and stores CID in blockchain
+The prepared-project launcher validates container ownership before starting any service. Three regression tests cover ownership mismatch, the eleven-service citizen selection and already-running department mode. A live stop/resume rehearsal of the three citizen services passed both identity-provider and API readiness checks.
 
-## Current Status
+Expiry, batch verification and overview validation: exact expiry boundary, revocation precedence, invalid expiry rejection, expiry-bound retry fingerprints, download denial before storage reads, owned summary counts and bounded incomplete scans pass in backend/chaincode tests. Live browser checks cover expiry issuance, active/expired/revoked totals, expired search, mixed five-file results, logout clearing and mobile layout. A separate intercepted response checks cancellation without sending the next file. Real citizen browser checks also ensure recent updates exclude another citizen’s document.
 
-### ✅ Completed Features
+Verification receipts and expiry alerts: 7/30-day boundary, private alert filtering, earliest-ten limits, receipt authentication and department/citizen denial tests pass. Browser tests confirm fresh PDF results after revocation, expired receipts, citizen receipts and clearing receipt availability when the selected file changes. A generated one-page receipt was independently parsed and visually inspected. Receipts contain no source document bytes or credentials and are explicitly unsigned snapshots.
 
-1. **Fabric Network Setup**
-   - Network bootstrap script (`scripts/bootstrap.sh`)
-   - Network management script (`scripts/network.sh`)
-   - Channel creation and peer joining
-   - Chaincode packaging and deployment
-
-2. **Chaincode Implementation**
-   - Complete JavaScript chaincode with all required functions
-   - Proper error handling and validation
-   - Deterministic transaction processing
-
-3. **Spring Boot API**
-   - Complete REST API implementation
-   - Fabric Gateway integration
-   - IPFS service integration
-   - Global exception handling
-   - Proper HTTP status codes
-
-4. **IPFS Integration**
-   - File upload service
-   - CID generation and storage
-   - Integration with blockchain registration
-
-5. **Documentation**
-   - Comprehensive README files
-   - API documentation
-   - Setup and configuration guides
-
-### ⚠️ Current Issues
-
-1. **TLS Configuration**
-   - Spring Boot API has TLS certificate trust issues
-   - Need to properly configure TLS certificates for production
-   - Currently using insecure connection for testing
-
-2. **Network Connectivity**
-   - Some connection issues between Spring Boot and Fabric network
-   - May be related to Docker networking or TLS configuration
-
-3. **Node.js Client**
-   - Access denied errors when connecting to Fabric network
-   - May need proper identity enrollment
-
-### 🔧 Technical Details
-
-#### Dependencies
-- **Fabric**: v2.5.12
-- **Fabric Gateway Java SDK**: 1.5.0
-- **Spring Boot**: 2.7.0
-- **Java**: 11+
-- **Node.js**: 16+
-- **Docker**: Latest
-
-#### File Structure
-```
-fabric/
-├── scripts/                    # Network management scripts
-├── chaincode/docregistry/      # Chaincode implementation
-├── application/
-│   ├── client/                 # Node.js client
-│   └── api-spring/            # Spring Boot API
-├── fabric-samples/            # Fabric samples (cloned)
-└── README.md                  # Main documentation
-```
-
-## Testing Results
-
-### ✅ Successful Tests
-1. **Fabric Network**: Successfully starts and runs
-2. **Chaincode Deployment**: Successfully deployed to both peers
-3. **Spring Boot API**: Starts and responds to requests
-4. **Error Handling**: Proper HTTP status codes for different error scenarios
-
-### ⚠️ Pending Tests
-1. **End-to-End Document Registration**: Blocked by TLS/connectivity issues
-2. **IPFS Integration**: Needs IPFS node running
-3. **Document Verification**: Requires successful registration first
-4. **Document Revocation**: Requires successful registration first
-
-## Next Steps
-
-### Immediate Actions
-1. **Fix TLS Configuration**
-   - Properly configure TLS certificates for Spring Boot
-   - Test secure connections to Fabric network
-
-2. **Resolve Connectivity Issues**
-   - Debug network connection problems
-   - Ensure proper Docker networking
-
-3. **Complete End-to-End Testing**
-   - Test document registration flow
-   - Test document verification flow
-   - Test document revocation flow
-
-### Production Readiness
-1. **Security Hardening**
-   - Enable TLS for all connections
-   - Implement proper authentication
-   - Add input validation and sanitization
-
-2. **Performance Optimization**
-   - Add connection pooling
-   - Implement caching where appropriate
-   - Add monitoring and logging
-
-3. **Deployment**
-   - Create Docker containers for all components
-   - Add Kubernetes deployment manifests
-   - Implement CI/CD pipeline
-
-## Conclusion
-
-The government document registry system has been successfully architected and implemented with:
-- ✅ Complete blockchain infrastructure
-- ✅ Full-featured REST API
-- ✅ IPFS integration for document storage
-- ✅ Comprehensive error handling
-- ✅ Proper documentation
-
-The main remaining work is resolving the TLS/connectivity issues to enable full end-to-end testing and production deployment.
+Final layout regression: maximum-length document IDs fit both the mobile dashboard and PDF receipt. The final browser feature suite and 16 live API plus two direct Fabric checks passed after the wrapping fix.

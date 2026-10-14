@@ -1,0 +1,88 @@
+name: govdoc-staging
+services:
+  database:
+    image: ${POSTGRES_IMAGE:?Pinned image required}
+    env_file: ../.runtime/staging/private/containers.env
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+    volumes: ["keycloak-db:/var/lib/postgresql/data"]
+    networks: [identity]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U keycloak -d keycloak"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  keycloak:
+    build:
+      context: .
+      dockerfile: keycloak.Dockerfile
+      args:
+        KEYCLOAK_IMAGE: ${KEYCLOAK_IMAGE:?Pinned image required}
+        KEYCLOAK_RUNTIME_IMAGE: ${KEYCLOAK_RUNTIME_IMAGE:?Pinned runtime required}
+    command: [start, --optimized, --import-realm]
+    env_file: ../.runtime/staging/private/containers.env
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://database:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_HOSTNAME: https://identity.govdoc.local:18443
+      KC_HTTPS_PORT: 18443
+      KC_HTTP_ENABLED: "false"
+      KC_HTTPS_CERTIFICATE_FILE: /run/tls/identity.pem
+      KC_HTTPS_CERTIFICATE_KEY_FILE: /run/tls/identity.key
+    group_add: ["${REGISTRY_GID:?Host group required}"]
+    volumes:
+      - ../.runtime/staging/tls/identity.pem:/run/tls/identity.pem:ro
+      - ../.runtime/staging/tls/identity.key:/run/tls/identity.key:ro
+      - ../.runtime/staging/import/govdoc-lab-realm.json:/opt/keycloak/data/import/govdoc-lab-realm.json:ro
+    networks:
+      identity:
+        aliases: [identity.govdoc.local]
+    ports: ["127.0.0.1:18443:18443"]
+    depends_on:
+      database: {condition: service_healthy}
+    security_opt: ["no-new-privileges:true"]
+  api:
+    build: ../application/api-spring
+    user: "${REGISTRY_UID:?Host user required}:${REGISTRY_GID:?Host group required}"
+    environment:
+      SPRING_PROFILES_ACTIVE: production
+      SERVER_PORT: 18444
+      SERVER_SSL_ENABLED: "true"
+      SERVER_SSL_CERTIFICATE: /run/tls/api.pem
+      SERVER_SSL_CERTIFICATE_PRIVATE_KEY: /run/tls/api.key
+      REGISTRY_JWT_ISSUER: https://identity.govdoc.local:18443/realms/govdoc-lab
+      REGISTRY_JWT_AUDIENCE: govdoc-api
+      REGISTRY_BROWSER_CLIENT: govdoc-browser
+      REGISTRY_KEYS_FILE: /run/secrets/encryption.json
+      REGISTRY_DATABASE_URL: jdbc:h2:file:/app/data/registry;DB_CLOSE_ON_EXIT=FALSE
+      FABRIC_PEER: peer0.org1.example.com:7051
+      FABRIC_AUTHORITY: peer0.org1.example.com
+      FABRIC_CERT: /run/identity/signcerts/cert.pem
+      FABRIC_KEY: /run/identity/keystore/key.pem
+      FABRIC_TLS_CERT: /run/identity/tls-ca.pem
+      IPFS_API_BASE: http://ipfs:5001
+      JAVA_TOOL_OPTIONS: -Djavax.net.ssl.trustStore=/run/tls/truststore.p12 -Djavax.net.ssl.trustStorePassword=changeit
+    ports: ["127.0.0.1:18444:18444"]
+    volumes:
+      - ../.runtime/identity:/run/identity:ro
+      - ../.runtime/staging/tls/api.pem:/run/tls/api.pem:ro
+      - ../.runtime/staging/tls/api.key:/run/tls/api.key:ro
+      - ../.runtime/staging/tls/truststore.p12:/run/tls/truststore.p12:ro
+      - ../.runtime/staging/private/encryption.json:/run/secrets/encryption.json:ro
+      - ../.runtime/staging/data:/app/data
+      - ../.runtime/staging/logs:/app/logs
+    networks: [identity, fabric, storage]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    restart: unless-stopped
+networks:
+  identity:
+  fabric: {external: true, name: govdoc_dev}
+  storage: {external: true, name: govdoc-dev-app_storage}
+volumes:
+  keycloak-db:
+    name: ${POSTGRES_VOLUME:-govdoc-staging_keycloak-db-alpine-v1}
